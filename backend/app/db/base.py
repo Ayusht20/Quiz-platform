@@ -12,3 +12,5 @@ from app.models.question import Question
 from app.models.option import Option
 from app.models.assessment import Assessment
 from app.models.assessment_question import AssessmentQuestion
+from app.models.attempt import Attempt
+from app.models.answer import Answer
