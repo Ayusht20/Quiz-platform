@@ -1,32 +1,43 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 
-class Skill(Base):
-    __tablename__ = "skills"
+class Question(Base):
+    __tablename__ = "questions"
 
     id: Mapped[int] = mapped_column(
         primary_key=True,
         index=True,
     )
 
-    category_id: Mapped[int] = mapped_column(
-        ForeignKey("categories.id", ondelete="CASCADE"),
+    skill_id: Mapped[int] = mapped_column(
+        ForeignKey("skills.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
 
-    name: Mapped[str] = mapped_column(
-        String(100),
+    question_text: Mapped[str] = mapped_column(
+        Text,
         nullable=False,
-        index=True,
     )
 
-    description: Mapped[str | None] = mapped_column(
+    difficulty: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="EASY",
+    )
+
+    marks: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=1,
+    )
+
+    explanation: Mapped[str | None] = mapped_column(
         Text,
         nullable=True,
     )
@@ -49,12 +60,13 @@ class Skill(Base):
         nullable=False,
     )
 
-    category = relationship(
-        "Category",
-        back_populates="skills",
+    skill = relationship(
+        "Skill",
+        back_populates="questions",
     )
-    questions = relationship(
-        "Question",
-        back_populates="skill",
+
+    options = relationship(
+        "Option",
+        back_populates="question",
         cascade="all, delete-orphan",
     )
