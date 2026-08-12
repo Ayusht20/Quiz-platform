@@ -7,10 +7,7 @@ from app.db.base import Base
 class Answer(Base):
     __tablename__ = "answers"
 
-    id: Mapped[int] = mapped_column(
-        primary_key=True,
-        index=True,
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     attempt_id: Mapped[int] = mapped_column(
         ForeignKey("attempts.id", ondelete="CASCADE"),
@@ -41,11 +38,6 @@ class Answer(Base):
         nullable=False,
     )
 
-    attempt = relationship(
-        "Attempt",
-        back_populates="answers",
-    )
-
+    attempt = relationship("Attempt", back_populates="answers")
     question = relationship("Question")
-
     selected_option = relationship("Option")

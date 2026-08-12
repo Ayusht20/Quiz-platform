@@ -9,10 +9,7 @@ from app.db.base import Base
 class Attempt(Base):
     __tablename__ = "attempts"
 
-    id: Mapped[int] = mapped_column(
-        primary_key=True,
-        index=True,
-    )
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"),
@@ -26,38 +23,24 @@ class Attempt(Base):
         index=True,
     )
 
-    score: Mapped[int] = mapped_column(
-        Integer,
-        default=0,
-        nullable=False,
-    )
+    score: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    percentage: Mapped[float] = mapped_column(
-        default=0,
-        nullable=False,
-    )
+    percentage: Mapped[float] = mapped_column(default=0, nullable=False)
 
     correct_answers: Mapped[int] = mapped_column(
-        Integer,
-        default=0,
-        nullable=False,
+        Integer, default=0, nullable=False
     )
 
     incorrect_answers: Mapped[int] = mapped_column(
-        Integer,
-        default=0,
-        nullable=False,
+        Integer, default=0, nullable=False
     )
 
     unanswered: Mapped[int] = mapped_column(
-        Integer,
-        default=0,
-        nullable=False,
+        Integer, default=0, nullable=False
     )
 
     time_taken_seconds: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True,
+        Integer, nullable=True
     )
 
     status: Mapped[str] = mapped_column(
@@ -89,5 +72,4 @@ class Attempt(Base):
     )
 
     user = relationship("User")
-
     assessment = relationship("Assessment")

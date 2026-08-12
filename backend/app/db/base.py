@@ -14,3 +14,7 @@ from app.models.assessment import Assessment
 from app.models.assessment_question import AssessmentQuestion
 from app.models.attempt import Attempt
 from app.models.answer import Answer
+from app.models.level import Level
+from app.models.badge import Badge
+from app.models.user_badge import UserBadge
+from app.models.xp_transaction import XPTransaction

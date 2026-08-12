@@ -4,7 +4,7 @@ from sqlalchemy import DateTime, Enum, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-
+from sqlalchemy import Integer
 
 class User(Base):
     __tablename__ = "users"
@@ -46,5 +46,16 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
+        nullable=False,
+    )
+    xp: Mapped[int] = mapped_column(
+    Integer,
+    default=0,
+    nullable=False,
+    )
+
+    level: Mapped[int] = mapped_column(
+        Integer,
+        default=1,
         nullable=False,
     )
