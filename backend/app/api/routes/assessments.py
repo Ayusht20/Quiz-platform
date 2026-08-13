@@ -9,7 +9,11 @@ from app.schemas.assessment import (
     AssessmentCreate,
     AssessmentResponse,
 )
-
+from app.models.assessment_question import AssessmentQuestion
+from app.models.question import Question
+from app.schemas.assessment_question import (
+    AssessmentQuestionCreate,
+)
 
 router = APIRouter(
     prefix="/assessments",
@@ -95,3 +99,63 @@ def publish_assessment(
     db.refresh(assessment)
 
     return assessment
+
+@router.post("/{assessment_id}/questions")
+def add_question_to_assessment(
+    assessment_id: int,
+    data: AssessmentQuestionCreate,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_admin),
+):
+    assessment = db.get(
+        Assessment,
+        assessment_id,
+    )
+
+    if not assessment:
+        raise HTTPException(
+            status_code=404,
+            detail="Assessment not found",
+        )
+
+    question = db.get(
+        Question,
+        data.question_id,
+    )
+
+    if not question:
+        raise HTTPException(
+            status_code=404,
+            detail="Question not found",
+        )
+
+    existing = db.scalar(
+        select(AssessmentQuestion).where(
+            AssessmentQuestion.assessment_id
+            == assessment_id,
+            AssessmentQuestion.question_id
+            == data.question_id,
+        )
+    )
+
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail="Question already added",
+        )
+
+    assessment_question = AssessmentQuestion(
+        assessment_id=assessment_id,
+        question_id=data.question_id,
+        question_order=data.question_order,
+    )
+
+    db.add(assessment_question)
+    db.commit()
+    db.refresh(assessment_question)
+
+    return {
+        "message": "Question added to assessment",
+        "assessment_question_id":
+            assessment_question.id,
+    }
