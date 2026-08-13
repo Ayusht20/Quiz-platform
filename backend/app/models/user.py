@@ -1,10 +1,10 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, String, func
+from sqlalchemy import DateTime, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
-from sqlalchemy import Integer
+
 
 class User(Base):
     __tablename__ = "users"
@@ -48,10 +48,11 @@ class User(Base):
         server_default=func.now(),
         nullable=False,
     )
+
     xp: Mapped[int] = mapped_column(
-    Integer,
-    default=0,
-    nullable=False,
+        Integer,
+        default=0,
+        nullable=False,
     )
 
     level: Mapped[int] = mapped_column(
