@@ -35,12 +35,16 @@ export function AuthProvider({ children }) {
       });
   }, []);
 
-  const login = (accessToken) => {
-    localStorage.setItem(
-      "access_token",
-      accessToken
-    );
-  };
+const login = async (accessToken) => {
+  localStorage.setItem(
+    "access_token",
+    accessToken
+  );
+
+  const response = await api.get("/users/me");
+
+  setUser(response.data);
+};
 
   const logout = () => {
     localStorage.removeItem("access_token");

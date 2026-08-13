@@ -7,18 +7,20 @@ import {
 
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Login from "./pages/auth/Login";
+import Register from "./pages/auth/Register";
+import Dashboard from "./pages/student/Dashboard";
+// function Login() {
+//   return <h1>Login</h1>;
+// }
 
-function Login() {
-  return <h1>Login</h1>;
-}
+// function Register() {
+//   return <h1>Register</h1>;
+// }
 
-function Register() {
-  return <h1>Register</h1>;
-}
-
-function StudentDashboard() {
-  return <h1>Student Dashboard</h1>;
-}
+// function StudentDashboard() {
+//   return <h1>Student Dashboard</h1>;
+// }
 
 function AdminDashboard() {
   return <h1>Admin Dashboard</h1>;
@@ -49,14 +51,14 @@ function App() {
             element={<Register />}
           />
 
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <StudentDashboard />
-              </ProtectedRoute>
-            }
-          />
+<Route
+  path="/dashboard"
+  element={
+    <ProtectedRoute>
+      <Dashboard />
+    </ProtectedRoute>
+  }
+/>
 
           <Route
             path="/admin"
