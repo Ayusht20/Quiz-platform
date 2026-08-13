@@ -10,6 +10,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import Dashboard from "./pages/student/Dashboard";
+import { ThemeProvider } from "./context/ThemeContext";
 // function Login() {
 //   return <h1>Login</h1>;
 // }
@@ -29,6 +30,7 @@ function AdminDashboard() {
 function App() {
   return (
     <BrowserRouter>
+    <ThemeProvider>
       <AuthProvider>
         <Routes>
           <Route
@@ -70,6 +72,7 @@ function App() {
           />
         </Routes>
       </AuthProvider>
+        </ThemeProvider>
     </BrowserRouter>
   );
 }
