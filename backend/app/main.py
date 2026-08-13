@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from sqlalchemy import text
 import app.models
 from app.db.database import engine
+from fastapi.middleware.cors import CORSMiddleware
 app= FastAPI(
     title="SkillArena API",
     description="Gamefied Skill Assessment Platform",
@@ -14,6 +15,16 @@ from app.api.routes.skills import router as skills_router
 from app.api.routes.questions import router as questions_router
 from app.api.routes.assessments import router as assessments_router
 from app.api.routes.leaderboard import router as leaderboard_router
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(
     auth_router,
