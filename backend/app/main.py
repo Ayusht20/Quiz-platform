@@ -1,14 +1,26 @@
 from fastapi import FastAPI
 from sqlalchemy import text
 import app.models
-from app.api.routes.auth import router as auth_router
 from app.db.database import engine
 app= FastAPI(
     title="SkillArena API",
     description="Gamefied Skill Assessment Platform",
 )
+from app.api.routes.auth import router as auth_router
+from app.api.routes.users import router as users_router
+from app.api.routes.admin import router as admin_router
+
 app.include_router(
     auth_router,
+    prefix="/api",
+)
+app.include_router(
+    admin_router,
+    prefix="/api",
+) 
+ 
+app.include_router(
+    users_router,
     prefix="/api",
 )
 @app.get("/")
