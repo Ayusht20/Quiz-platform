@@ -13,6 +13,8 @@ from app.api.routes.categories import router as categories_router
 from app.api.routes.skills import router as skills_router
 from app.api.routes.questions import router as questions_router
 from app.api.routes.assessments import router as assessments_router
+from app.api.routes.leaderboard import router as leaderboard_router
+
 app.include_router(
     auth_router,
     prefix="/api",
@@ -44,6 +46,11 @@ app.include_router(
     assessments_router,
     prefix="/api",
 )
+app.include_router(
+    leaderboard_router,
+    prefix="/api",
+)
+
 @app.get("/")
 def root():
     return {"message":"Welcome to SkillArena API!!"

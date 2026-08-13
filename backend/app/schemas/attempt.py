@@ -29,3 +29,6 @@ class AttemptResultResponse(BaseModel):
     unanswered: int
     time_taken_seconds: int | None
     status: str
+    xp_earned: int
+    current_xp: int
+    current_level: int
