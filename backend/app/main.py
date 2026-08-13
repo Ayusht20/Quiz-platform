@@ -9,7 +9,10 @@ app= FastAPI(
 from app.api.routes.auth import router as auth_router
 from app.api.routes.users import router as users_router
 from app.api.routes.admin import router as admin_router
-
+from app.api.routes.categories import router as categories_router
+from app.api.routes.skills import router as skills_router
+from app.api.routes.questions import router as questions_router
+from app.api.routes.assessments import router as assessments_router
 app.include_router(
     auth_router,
     prefix="/api",
@@ -21,6 +24,24 @@ app.include_router(
  
 app.include_router(
     users_router,
+    prefix="/api",
+)
+app.include_router(
+    categories_router,
+    prefix="/api",
+)
+
+app.include_router(
+    skills_router,
+    prefix="/api",
+)
+
+app.include_router(
+    questions_router,
+    prefix="/api",
+)
+app.include_router(
+    assessments_router,
     prefix="/api",
 )
 @app.get("/")
