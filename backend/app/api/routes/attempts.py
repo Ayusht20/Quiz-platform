@@ -394,4 +394,7 @@ def submit_attempt(
         unanswered=attempt.unanswered,
         time_taken_seconds=attempt.time_taken_seconds,
         status=attempt.status,
+        xp_earned=xp_earned,
+        current_xp=current_user.xp,
+        current_level=current_user.level,
     )
