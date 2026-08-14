@@ -6,73 +6,188 @@ import {
 } from "react-router-dom";
 
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
+
 import ProtectedRoute from "./components/ProtectedRoute";
+
+// Auth
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+
+// Student
 import Dashboard from "./pages/student/Dashboard";
-import { ThemeProvider } from "./context/ThemeContext";
-// function Login() {
-//   return <h1>Login</h1>;
-// }
+import Practice from "./pages/student/Practice";
+import Battle from "./pages/student/Battle";
 
-// function Register() {
-//   return <h1>Register</h1>;
-// }
-
-// function StudentDashboard() {
-//   return <h1>Student Dashboard</h1>;
-// }
-
-function AdminDashboard() {
-  return <h1>Admin Dashboard</h1>;
-}
+// Admin
+import AdminLayout from "./pages/admin/AdminLayout";
+import AdminDashboard from "./pages/admin/Dashboard";
+import Assessments from "./pages/admin/Assessments";
+import CreateAssessment from "./pages/admin/CreateAssessment";
+import Questions from "./pages/admin/Questions";
+import QuestionEditor from "./pages/admin/QuestionEditor";
 
 function App() {
   return (
     <BrowserRouter>
-    <ThemeProvider>
-      <AuthProvider>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <Navigate
-                to="/dashboard"
-                replace
+      <ThemeProvider>
+        <AuthProvider>
+
+          <Routes>
+
+            {/* ================================================= */}
+            {/* ROOT */}
+            {/* ================================================= */}
+
+            <Route
+              path="/"
+              element={
+                <Navigate
+                  to="/dashboard"
+                  replace
+                />
+              }
+            />
+
+
+            {/* ================================================= */}
+            {/* AUTH */}
+            {/* ================================================= */}
+
+            <Route
+              path="/login"
+              element={<Login />}
+            />
+
+            <Route
+              path="/register"
+              element={<Register />}
+            />
+
+
+            {/* ================================================= */}
+            {/* STUDENT ROUTES */}
+            {/* ================================================= */}
+
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute role="STUDENT">
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/practice"
+              element={
+                <ProtectedRoute role="STUDENT">
+                  <Practice />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/practice/:assessmentId"
+              element={
+                <ProtectedRoute role="STUDENT">
+                  <Battle />
+                </ProtectedRoute>
+              }
+            />
+
+
+            {/* ================================================= */}
+            {/* ADMIN ROUTES */}
+            {/* ================================================= */}
+
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute role="ADMIN">
+                  <AdminLayout />
+                </ProtectedRoute>
+              }
+            >
+
+              {/* /admin → /admin/dashboard */}
+
+              <Route
+                index
+                element={
+                  <Navigate
+                    to="/admin/dashboard"
+                    replace
+                  />
+                }
               />
-            }
-          />
 
-          <Route
-            path="/login"
-            element={<Login />}
-          />
 
-          <Route
-            path="/register"
-            element={<Register />}
-          />
+              {/* ADMIN DASHBOARD */}
 
-<Route
-  path="/dashboard"
+              <Route
+                path="dashboard"
+                element={
+                  <AdminDashboard />
+                }
+              />
+
+
+              {/* QUESTION BANK */}
+
+              <Route
+                path="questions"
+                element={
+                  <Questions />
+                }
+              />
+              <Route
+  path="questions/create"
   element={
-    <ProtectedRoute>
-      <Dashboard />
-    </ProtectedRoute>
+    <QuestionEditor />
   }
 />
 
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute role="ADMIN">
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </AuthProvider>
-        </ThemeProvider>
+              {/* BATTLES / ASSESSMENTS */}
+
+              <Route
+                path="assessments"
+                element={
+                  <Assessments />
+                }
+              />
+
+
+              {/* CREATE BATTLE */}
+
+              <Route
+                path="assessments/create"
+                element={
+                  <CreateAssessment />
+                }
+              />
+
+            </Route>
+
+
+            {/* ================================================= */}
+            {/* FALLBACK */}
+            {/* ================================================= */}
+
+            <Route
+              path="*"
+              element={
+                <Navigate
+                  to="/dashboard"
+                  replace
+                />
+              }
+            />
+
+          </Routes>
+
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

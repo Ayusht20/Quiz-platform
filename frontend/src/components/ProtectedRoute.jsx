@@ -8,15 +8,39 @@ export default function ProtectedRoute({
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-[var(--text)]">
+        <div className="text-sm font-semibold text-[var(--muted)]">
+          Loading SkillArena...
+        </div>
+      </div>
+    );
   }
 
+  // Not logged in
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
+  // Role protection
   if (role && user.role !== role) {
-    return <Navigate to="/dashboard" replace />;
+    // Admin trying to access a student-only route
+    if (user.role === "ADMIN") {
+      return (
+        <Navigate
+          to="/admin/dashboard"
+          replace
+        />
+      );
+    }
+
+    // Student trying to access an admin route
+    return (
+      <Navigate
+        to="/dashboard"
+        replace
+      />
+    );
   }
 
   return children;

@@ -14,42 +14,93 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
+    loadCurrentUser();
+  }, []);
+
+  const loadCurrentUser = async () => {
+    const token =
+      localStorage.getItem("access_token");
 
     if (!token) {
       setLoading(false);
       return;
     }
 
-    api
-      .get("/users/me")
-      .then((response) => {
-        setUser(response.data);
-      })
-      .catch(() => {
-        localStorage.removeItem("access_token");
+    try {
+      const response =
+        await api.get("/users/me");
+
+      setUser(response.data);
+
+    } catch (error) {
+      console.error(
+        "Failed to load current user:",
+        error
+      );
+
+      /*
+       * Only remove the token when the
+       * backend explicitly says the token
+       * is unauthorized.
+       */
+
+      if (
+        error.response?.status === 401
+      ) {
+        localStorage.removeItem(
+          "access_token"
+        );
+
         setUser(null);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
+      }
 
-const login = async (accessToken) => {
-  localStorage.setItem(
-    "access_token",
-    accessToken
-  );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const response = await api.get("/users/me");
 
-  setUser(response.data);
-};
+  const login = async (accessToken) => {
+    localStorage.setItem(
+      "access_token",
+      accessToken
+    );
+
+    try {
+      const response =
+        await api.get("/users/me");
+
+      setUser(response.data);
+
+      return response.data;
+
+    } catch (error) {
+
+      /*
+       * If login succeeded but /users/me
+       * failed, don't silently leave the
+       * application in a broken state.
+       */
+
+      localStorage.removeItem(
+        "access_token"
+      );
+
+      setUser(null);
+
+      throw error;
+    }
+  };
+
 
   const logout = () => {
-    localStorage.removeItem("access_token");
+    localStorage.removeItem(
+      "access_token"
+    );
+
     setUser(null);
   };
+
 
   return (
     <AuthContext.Provider
@@ -58,12 +109,14 @@ const login = async (accessToken) => {
         loading,
         login,
         logout,
+        refreshUser: loadCurrentUser,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
 }
+
 
 export function useAuth() {
   return useContext(AuthContext);
