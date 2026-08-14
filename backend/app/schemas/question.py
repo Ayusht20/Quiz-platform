@@ -29,6 +29,7 @@ class QuestionCreate(BaseModel):
 class QuestionResponse(BaseModel):
     id: int
     skill_id: int
+    topic: str | None
     question_text: str
     difficulty: str
     marks: int
@@ -36,4 +37,6 @@ class QuestionResponse(BaseModel):
     is_active: bool
     options: list[OptionResponse]
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True
+    )

@@ -19,7 +19,11 @@ class Question(Base):
         nullable=False,
         index=True,
     )
-
+    topic: Mapped[str | None] = mapped_column(
+    String(150),
+    nullable=True,
+    index=True,
+    )
     question_text: Mapped[str] = mapped_column(
         Text,
         nullable=False,
@@ -64,9 +68,11 @@ class Question(Base):
         "Skill",
         back_populates="questions",
     )
+    
 
     options = relationship(
         "Option",
         back_populates="question",
         cascade="all, delete-orphan",
     )
+    

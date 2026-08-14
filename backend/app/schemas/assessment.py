@@ -26,3 +26,45 @@ class AssessmentResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class PublicOptionResponse(BaseModel):
+    id: int
+    option_text: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PublicQuestionResponse(BaseModel):
+    id: int
+    skill_id: int
+    question_text: str
+    difficulty: str
+    marks: int
+    options: list[PublicOptionResponse]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AssessmentDetailResponse(BaseModel):
+    id: int
+    title: str
+    description: str | None
+    assessment_type: str
+    difficulty: str
+    duration_minutes: int
+    passing_percentage: int
+    max_attempts: int | None
+    is_published: bool
+    created_at: datetime
+    questions: list[PublicQuestionResponse]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AttemptStartResponse(BaseModel):
+    attempt_id: int
+    assessment_id: int
+    started_at: datetime
+    expires_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

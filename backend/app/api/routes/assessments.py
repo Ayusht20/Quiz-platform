@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session ,selectinload
 
 from app.api.dependencies import get_current_user, require_admin
 from app.db.session import get_db
@@ -8,12 +8,18 @@ from app.models.assessment import Assessment
 from app.schemas.assessment import (
     AssessmentCreate,
     AssessmentResponse,
+       AssessmentDetailResponse,
+    AttemptStartResponse,
 )
+
 from app.models.assessment_question import AssessmentQuestion
 from app.models.question import Question
 from app.schemas.assessment_question import (
     AssessmentQuestionCreate,
 )
+from datetime import datetime, timezone, timedelta
+from sqlalchemy import func
+from app.models.attempt import Attempt
 
 router = APIRouter(
     prefix="/assessments",
@@ -34,6 +40,82 @@ def get_assessments(
         .order_by(Assessment.id.desc())
     ).all()
 
+@router.get(
+    "/{assessment_id}",
+    response_model=AssessmentDetailResponse,
+)
+def get_assessment(
+    assessment_id: int,
+    db: Session = Depends(get_db),
+):
+    assessment = db.scalar(
+        select(Assessment)
+        .options(
+            selectinload(
+                Assessment.assessment_questions
+            )
+            .selectinload(
+                AssessmentQuestion.question
+            )
+            .selectinload(
+                Question.options
+            )
+        )
+        .where(
+            Assessment.id == assessment_id,
+            Assessment.is_published.is_(True),
+        )
+    )
+
+    if not assessment:
+        raise HTTPException(
+            status_code=404,
+            detail="Assessment not found",
+        )
+
+    ordered_questions = sorted(
+        assessment.assessment_questions,
+        key=lambda item: item.question_order,
+    )
+
+    questions = []
+
+    for assessment_question in ordered_questions:
+        question = assessment_question.question
+
+        if not question.is_active:
+            continue
+
+        questions.append(
+            {
+                "id": question.id,
+                "skill_id": question.skill_id,
+                "question_text": question.question_text,
+                "difficulty": question.difficulty,
+                "marks": question.marks,
+                "options": [
+                    {
+                        "id": option.id,
+                        "option_text": option.option_text,
+                    }
+                    for option in question.options
+                ],
+            }
+        )
+
+    return {
+        "id": assessment.id,
+        "title": assessment.title,
+        "description": assessment.description,
+        "assessment_type": assessment.assessment_type,
+        "difficulty": assessment.difficulty,
+        "duration_minutes": assessment.duration_minutes,
+        "passing_percentage": assessment.passing_percentage,
+        "max_attempts": assessment.max_attempts,
+        "is_published": assessment.is_published,
+        "created_at": assessment.created_at,
+        "questions": questions,
+    }
 
 @router.get(
     "/admin/all",
