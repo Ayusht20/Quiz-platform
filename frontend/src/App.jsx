@@ -10,22 +10,33 @@ import { ThemeProvider } from "./context/ThemeContext";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 
-// Auth
+// ============================================================
+// AUTH
+// ============================================================
+
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 
-// Student
+// ============================================================
+// STUDENT
+// ============================================================
+
 import Dashboard from "./pages/student/Dashboard";
 import Practice from "./pages/student/Practice";
 import Battle from "./pages/student/Battle";
 
-// Admin
+// ============================================================
+// ADMIN
+// ============================================================
+
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 import Assessments from "./pages/admin/Assessments";
 import CreateAssessment from "./pages/admin/CreateAssessment";
+import AssessmentDetails from "./pages/admin/AssessmentDetails";
 import Questions from "./pages/admin/Questions";
 import QuestionEditor from "./pages/admin/QuestionEditor";
+
 
 function App() {
   return (
@@ -98,7 +109,7 @@ function App() {
 
 
             {/* ================================================= */}
-            {/* ADMIN ROUTES */}
+            {/* ADMIN */}
             {/* ================================================= */}
 
             <Route
@@ -110,7 +121,9 @@ function App() {
               }
             >
 
-              {/* /admin → /admin/dashboard */}
+              {/* =============================================== */}
+              {/* ADMIN ROOT */}
+              {/* =============================================== */}
 
               <Route
                 index
@@ -123,7 +136,9 @@ function App() {
               />
 
 
+              {/* =============================================== */}
               {/* ADMIN DASHBOARD */}
+              {/* =============================================== */}
 
               <Route
                 path="dashboard"
@@ -133,7 +148,9 @@ function App() {
               />
 
 
+              {/* =============================================== */}
               {/* QUESTION BANK */}
+              {/* =============================================== */}
 
               <Route
                 path="questions"
@@ -141,14 +158,20 @@ function App() {
                   <Questions />
                 }
               />
-              <Route
-  path="questions/create"
-  element={
-    <QuestionEditor />
-  }
-/>
 
+              {/* CREATE QUESTION */}
+
+              <Route
+                path="questions/create"
+                element={
+                  <QuestionEditor />
+                }
+              />
+
+
+              {/* =============================================== */}
               {/* BATTLES / ASSESSMENTS */}
+              {/* =============================================== */}
 
               <Route
                 path="assessments"
@@ -164,6 +187,18 @@ function App() {
                 path="assessments/create"
                 element={
                   <CreateAssessment />
+                }
+              />
+
+
+              {/* =============================================== */}
+              {/* MANAGE BATTLE */}
+              {/* =============================================== */}
+
+              <Route
+                path="assessments/:assessmentId"
+                element={
+                  <AssessmentDetails />
                 }
               />
 
