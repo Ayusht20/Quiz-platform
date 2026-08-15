@@ -15,6 +15,7 @@ from app.api.routes.skills import router as skills_router
 from app.api.routes.questions import router as questions_router
 from app.api.routes.assessments import router as assessments_router
 from app.api.routes.leaderboard import router as leaderboard_router
+from app.api.routes.attempts import router as attempts_router
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,7 +62,7 @@ app.include_router(
     leaderboard_router,
     prefix="/api",
 )
-
+app.include_router(attempts_router,prefix="/api")
 @app.get("/")
 def root():
     return {"message":"Welcome to SkillArena API!!"

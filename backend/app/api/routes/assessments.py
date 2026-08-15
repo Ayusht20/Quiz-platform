@@ -11,9 +11,9 @@ from app.schemas.assessment import (
        AssessmentDetailResponse,
     AttemptStartResponse,
 )
-
+from app.schemas.question import QuestionResponse
 from app.models.assessment_question import AssessmentQuestion
-from app.models.question import Question
+from app.models.question import Question 
 from app.schemas.assessment_question import (
     AssessmentQuestionCreate,
 )
@@ -241,3 +241,45 @@ def add_question_to_assessment(
         "assessment_question_id":
             assessment_question.id,
     }
+
+@router.get(
+    "/{assessment_id}/questions",
+    response_model=list[QuestionResponse],
+)
+def get_assessment_questions(
+    assessment_id: int,
+    db: Session = Depends(get_db),
+    _: object = Depends(require_admin),
+):
+    assessment = db.get(
+        Assessment,
+        assessment_id,
+    )
+
+    if not assessment:
+        raise HTTPException(
+            status_code=404,
+            detail="Assessment not found",
+        )
+
+    questions = db.scalars(
+        select(Question)
+        .join(
+            AssessmentQuestion,
+            AssessmentQuestion.question_id
+            == Question.id,
+        )
+        .options(
+            selectinload(Question.options)
+        )
+        .where(
+            AssessmentQuestion.assessment_id
+            == assessment_id,
+            Question.is_active.is_(True),
+        )
+        .order_by(
+            AssessmentQuestion.question_order
+        )
+    ).all()
+
+    return questions
