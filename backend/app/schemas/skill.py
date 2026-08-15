@@ -22,3 +22,20 @@ class SkillResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+class SkillProgressResponse(BaseModel):
+    skill_id: int
+    skill_name: str
+    category_id: int
+    category_name: str
+
+    xp: int
+    questions_answered: int
+    questions_correct: int
+    battles_completed: int
+
+    accuracy: float
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )

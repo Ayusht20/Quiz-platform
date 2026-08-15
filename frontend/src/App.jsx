@@ -7,8 +7,9 @@ import {
 
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
-
+import SkillTree from "./pages/student/SkillTree";
 import ProtectedRoute from "./components/ProtectedRoute";
+// import SkillTree from "./pages/student/SkillTree";
 
 // ============================================================
 // AUTH
@@ -106,7 +107,22 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
+            <Route
+  path="/skills"
+  element={
+    <ProtectedRoute role="STUDENT">
+      <SkillTree />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/skills"
+  element={
+    <ProtectedRoute role="STUDENT">
+      <SkillTree />
+    </ProtectedRoute>
+  }
+/>
 
             {/* ================================================= */}
             {/* ADMIN */}

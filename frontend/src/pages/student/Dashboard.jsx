@@ -9,7 +9,7 @@ import {
   Target,
   Star,
 } from "lucide-react";
-
+import { Link } from "lucide-react";
 import { motion } from "framer-motion";
 
 import Sidebar from "../../components/Sidebar";
@@ -674,9 +674,9 @@ export default function Dashboard() {
                   Progression
                 </p>
 
-                <h2 className="mt-1 text-2xl font-black">
-                  Skill Tree
-                </h2>
+<Link to="/skills">
+  Skill Tree
+</Link>
 
               </div>
 
