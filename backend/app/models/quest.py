@@ -8,7 +8,11 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import (
+    Mapped,
+    mapped_column,
+    relationship,
+)
 
 from app.db.base import Base
 
@@ -73,4 +77,21 @@ class Quest(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    # ========================================================
+    # RELATIONSHIPS
+    # ========================================================
+
+    user_quests = relationship(
+        "UserQuest",
+        back_populates="quest",
+        cascade="all, delete-orphan",
     )

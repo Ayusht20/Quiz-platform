@@ -30,8 +30,9 @@ from app.services.xp_service import (
 from app.services.badge_service import check_badges
 
 from app.services.quest_service import (
-    update_quest_progress,
+    update_battle_quests,
     update_question_quests,
+    update_quest_progress,
 )
 
 
@@ -72,7 +73,7 @@ def start_attempt(
         )
 
     # --------------------------------------------------------
-    # Check for existing unfinished attempt
+    # Existing unfinished attempt
     # --------------------------------------------------------
 
     existing_attempt = db.scalar(
@@ -82,7 +83,9 @@ def start_attempt(
             Attempt.assessment_id == assessment_id,
             Attempt.status == "IN_PROGRESS",
         )
-        .order_by(Attempt.id.desc())
+        .order_by(
+            Attempt.id.desc()
+        )
     )
 
     if existing_attempt:
@@ -94,7 +97,7 @@ def start_attempt(
         )
 
     # --------------------------------------------------------
-    # Check maximum attempts
+    # Maximum attempts
     # --------------------------------------------------------
 
     if assessment.max_attempts is not None:
@@ -301,10 +304,7 @@ def submit_attempt(
         ).total_seconds()
     )
 
-    attempt.time_taken_seconds = (
-        time_taken
-    )
-
+    attempt.time_taken_seconds = time_taken
     attempt.completed_at = now
 
     # --------------------------------------------------------
@@ -355,7 +355,10 @@ def submit_attempt(
         if not question:
             continue
 
+        # ----------------------------------------------------
         # Prevent duplicate answers
+        # ----------------------------------------------------
+
         if question.id in submitted_question_ids:
             continue
 
@@ -422,7 +425,6 @@ def submit_attempt(
             skill_data["answered"] += 1
             skill_data["correct"] += 1
 
-            # 10 skill XP per mark
             skill_data["xp"] += (
                 question.marks * 10
             )
@@ -483,17 +485,17 @@ def submit_attempt(
         else 0
     )
 
+    percentage = round(
+        percentage,
+        2,
+    )
+
     # --------------------------------------------------------
     # Update attempt result
     # --------------------------------------------------------
 
     attempt.score = total_score
-
-    attempt.percentage = round(
-        percentage,
-        2,
-    )
-
+    attempt.percentage = percentage
     attempt.correct_answers = correct
     attempt.incorrect_answers = incorrect
     attempt.unanswered = unanswered
@@ -512,6 +514,19 @@ def submit_attempt(
             status_code=404,
             detail="Assessment not found",
         )
+
+    # ========================================================
+    # BATTLE RESULT
+    # ========================================================
+
+    passed = (
+        percentage
+        >= assessment.passing_percentage
+    )
+
+    perfect = (
+        percentage >= 100
+    )
 
     # ========================================================
     # GLOBAL XP
@@ -560,12 +575,25 @@ def submit_attempt(
                 questions_answered=0,
                 questions_correct=0,
                 battles_completed=0,
+                completed=False,
+                mastered=False,
             )
 
             db.add(progress)
 
+            # Make the object available immediately
+            # for state checks below.
+            db.flush()
+
         # ----------------------------------------------------
-        # Update skill
+        # Capture previous skill state
+        # ----------------------------------------------------
+
+        was_completed = progress.completed
+        was_mastered = progress.mastered
+
+        # ----------------------------------------------------
+        # Update statistics
         # ----------------------------------------------------
 
         progress.xp += stats["xp"]
@@ -580,6 +608,76 @@ def submit_attempt(
 
         progress.battles_completed += 1
 
+        # ====================================================
+        # SKILL COMPLETION
+        # ====================================================
+
+        # A skill becomes completed when the student has
+        # answered at least one question belonging to it.
+
+        skill_completed_now = (
+            stats["answered"] > 0
+        )
+
+        if (
+            skill_completed_now
+            and not progress.completed
+        ):
+
+            progress.completed = True
+
+        # ====================================================
+        # SKILL MASTERY
+        # ====================================================
+
+        # A skill is mastered when every answered question
+        # for that skill in this battle is correct.
+
+        skill_mastered_now = (
+            stats["answered"] > 0
+            and stats["correct"]
+            == stats["answered"]
+        )
+
+        if (
+            skill_mastered_now
+            and not progress.mastered
+        ):
+
+            progress.mastered = True
+
+        # ====================================================
+        # COMPLETED SKILLS QUEST
+        # ====================================================
+
+        if (
+            not was_completed
+            and progress.completed
+        ):
+
+            update_quest_progress(
+                db=db,
+                user=current_user,
+                target_type="COMPLETED_SKILLS",
+                amount=1,
+            )
+
+        # ====================================================
+        # MASTERED SKILLS QUEST
+        # ====================================================
+
+        if (
+            not was_mastered
+            and progress.mastered
+        ):
+
+            update_quest_progress(
+                db=db,
+                user=current_user,
+                target_type="MASTERED_SKILLS",
+                amount=1,
+            )
+
     # ========================================================
     # QUEST PROGRESS
     # ========================================================
@@ -587,20 +685,20 @@ def submit_attempt(
     completed_quests = []
 
     # --------------------------------------------------------
-    # Battle quest
+    # Battle / passed / perfect quests
     # --------------------------------------------------------
 
     completed_quests.extend(
-        update_quest_progress(
+        update_battle_quests(
             db=db,
             user=current_user,
-            target_type="BATTLES",
-            amount=1,
+            passed=passed,
+            perfect=perfect,
         )
     )
 
     # --------------------------------------------------------
-    # Question + correct-answer quests
+    # Question / correct-answer quests
     # --------------------------------------------------------
 
     completed_quests.extend(

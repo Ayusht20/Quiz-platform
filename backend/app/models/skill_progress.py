@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     Integer,
@@ -29,22 +30,36 @@ class SkillProgress(Base):
     )
 
     user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"),
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE",
+        ),
         nullable=False,
         index=True,
     )
 
     skill_id: Mapped[int] = mapped_column(
-        ForeignKey("skills.id", ondelete="CASCADE"),
+        ForeignKey(
+            "skills.id",
+            ondelete="CASCADE",
+        ),
         nullable=False,
         index=True,
     )
+
+    # ========================================================
+    # SKILL XP
+    # ========================================================
 
     xp: Mapped[int] = mapped_column(
         Integer,
         default=0,
         nullable=False,
     )
+
+    # ========================================================
+    # QUESTION STATISTICS
+    # ========================================================
 
     questions_answered: Mapped[int] = mapped_column(
         Integer,
@@ -58,11 +73,35 @@ class SkillProgress(Base):
         nullable=False,
     )
 
+    # ========================================================
+    # BATTLE STATISTICS
+    # ========================================================
+
     battles_completed: Mapped[int] = mapped_column(
         Integer,
         default=0,
         nullable=False,
     )
+
+    # ========================================================
+    # SKILL STATUS
+    # ========================================================
+
+    completed: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    mastered: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
+    # ========================================================
+    # TIMESTAMP
+    # ========================================================
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -71,6 +110,14 @@ class SkillProgress(Base):
         nullable=False,
     )
 
-    user = relationship("User")
+    # ========================================================
+    # RELATIONSHIPS
+    # ========================================================
 
-    skill = relationship("Skill")
+    user = relationship(
+        "User",
+    )
+
+    skill = relationship(
+        "Skill",
+    )
