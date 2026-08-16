@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -28,6 +28,11 @@ from app.services.xp_service import (
 )
 
 from app.services.badge_service import check_badges
+
+from app.services.quest_service import (
+    update_quest_progress,
+    update_question_quests,
+)
 
 
 router = APIRouter(
@@ -93,18 +98,25 @@ def start_attempt(
     # --------------------------------------------------------
 
     if assessment.max_attempts is not None:
+
         completed_attempts = db.scalars(
             select(Attempt)
             .where(
                 Attempt.user_id == current_user.id,
                 Attempt.assessment_id == assessment_id,
                 Attempt.status.in_(
-                    ["COMPLETED", "TIME_EXPIRED"]
+                    [
+                        "COMPLETED",
+                        "TIME_EXPIRED",
+                    ]
                 ),
             )
         ).all()
 
-        if len(completed_attempts) >= assessment.max_attempts:
+        if (
+            len(completed_attempts)
+            >= assessment.max_attempts
+        ):
             raise HTTPException(
                 status_code=400,
                 detail="Maximum attempts reached",
@@ -118,7 +130,7 @@ def start_attempt(
 
     expires_datetime = (
         now
-        + __import__("datetime").timedelta(
+        + timedelta(
             minutes=assessment.duration_minutes
         )
     )
@@ -132,7 +144,9 @@ def start_attempt(
     )
 
     db.add(attempt)
+
     db.commit()
+
     db.refresh(attempt)
 
     return AttemptStartResponse(
@@ -179,6 +193,7 @@ def get_attempt(
     now = datetime.now(timezone.utc)
 
     if now >= attempt.expires_at:
+
         attempt.status = "TIME_EXPIRED"
         attempt.completed_at = now
 
@@ -193,7 +208,8 @@ def get_attempt(
         select(Question)
         .join(
             AssessmentQuestion,
-            AssessmentQuestion.question_id == Question.id,
+            AssessmentQuestion.question_id
+            == Question.id,
         )
         .where(
             AssessmentQuestion.assessment_id
@@ -280,10 +296,15 @@ def submit_attempt(
         attempt.status = "COMPLETED"
 
     time_taken = int(
-        (now - attempt.started_at).total_seconds()
+        (
+            now - attempt.started_at
+        ).total_seconds()
     )
 
-    attempt.time_taken_seconds = time_taken
+    attempt.time_taken_seconds = (
+        time_taken
+    )
+
     attempt.completed_at = now
 
     # --------------------------------------------------------
@@ -294,7 +315,8 @@ def submit_attempt(
         select(Question)
         .join(
             AssessmentQuestion,
-            AssessmentQuestion.question_id == Question.id,
+            AssessmentQuestion.question_id
+            == Question.id,
         )
         .where(
             AssessmentQuestion.assessment_id
@@ -319,22 +341,7 @@ def submit_attempt(
     total_score = 0
 
     # --------------------------------------------------------
-    # Skill statistics for this battle
-    #
-    # Example:
-    #
-    # {
-    #     1: {
-    #         "answered": 5,
-    #         "correct": 4,
-    #         "xp": 40
-    #     },
-    #     2: {
-    #         "answered": 3,
-    #         "correct": 2,
-    #         "xp": 20
-    #     }
-    # }
+    # Skill statistics
     # --------------------------------------------------------
 
     skill_stats = {}
@@ -348,7 +355,7 @@ def submit_attempt(
         if not question:
             continue
 
-        # Prevent duplicate answers for the same question
+        # Prevent duplicate answers
         if question.id in submitted_question_ids:
             continue
 
@@ -356,7 +363,10 @@ def submit_attempt(
             question.id
         )
 
+        # ----------------------------------------------------
         # Create skill entry
+        # ----------------------------------------------------
+
         skill_data = skill_stats.setdefault(
             question.skill_id,
             {
@@ -369,10 +379,11 @@ def submit_attempt(
         selected_option = None
 
         # ----------------------------------------------------
-        # Validate selected option belongs to question
+        # Validate selected option
         # ----------------------------------------------------
 
         if submitted_answer.selected_option_id:
+
             selected_option = db.scalar(
                 select(Option).where(
                     Option.id
@@ -411,8 +422,7 @@ def submit_attempt(
             skill_data["answered"] += 1
             skill_data["correct"] += 1
 
-            # Skill XP:
-            # 10 XP per mark for a correct answer
+            # 10 skill XP per mark
             skill_data["xp"] += (
                 question.marks * 10
             )
@@ -446,7 +456,7 @@ def submit_attempt(
         db.add(answer)
 
     # --------------------------------------------------------
-    # Questions that weren't submitted at all
+    # Questions not submitted
     # --------------------------------------------------------
 
     unanswered += (
@@ -464,7 +474,11 @@ def submit_attempt(
     )
 
     percentage = (
-        (total_score / total_marks) * 100
+        (
+            total_score
+            / total_marks
+        )
+        * 100
         if total_marks > 0
         else 0
     )
@@ -499,9 +513,9 @@ def submit_attempt(
             detail="Assessment not found",
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # GLOBAL XP
-    # --------------------------------------------------------
+    # ========================================================
 
     xp_earned = calculate_xp(
         attempt.percentage,
@@ -512,12 +526,15 @@ def submit_attempt(
         db=db,
         user=current_user,
         amount=xp_earned,
-        reason=f"Completed {assessment.title}",
+        reason=(
+            f"Completed "
+            f"{assessment.title}"
+        ),
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # SKILL PROGRESS
-    # --------------------------------------------------------
+    # ========================================================
 
     for skill_id, stats in skill_stats.items():
 
@@ -530,9 +547,10 @@ def submit_attempt(
             )
         )
 
-        # Create progress row if this is
-        # the student's first battle
-        # containing this skill.
+        # ----------------------------------------------------
+        # Create first progress record
+        # ----------------------------------------------------
+
         if not progress:
 
             progress = SkillProgress(
@@ -546,7 +564,10 @@ def submit_attempt(
 
             db.add(progress)
 
-        # Add skill progress
+        # ----------------------------------------------------
+        # Update skill
+        # ----------------------------------------------------
+
         progress.xp += stats["xp"]
 
         progress.questions_answered += (
@@ -559,24 +580,58 @@ def submit_attempt(
 
         progress.battles_completed += 1
 
+    # ========================================================
+    # QUEST PROGRESS
+    # ========================================================
+
+    completed_quests = []
+
     # --------------------------------------------------------
+    # Battle quest
+    # --------------------------------------------------------
+
+    completed_quests.extend(
+        update_quest_progress(
+            db=db,
+            user=current_user,
+            target_type="BATTLES",
+            amount=1,
+        )
+    )
+
+    # --------------------------------------------------------
+    # Question + correct-answer quests
+    # --------------------------------------------------------
+
+    completed_quests.extend(
+        update_question_quests(
+            db=db,
+            user=current_user,
+            questions_answered=len(
+                submitted_question_ids
+            ),
+            correct_answers=correct,
+        )
+    )
+
+    # ========================================================
     # CHECK BADGES
-    # --------------------------------------------------------
+    # ========================================================
 
     check_badges(
         db=db,
         user_id=current_user.id,
     )
 
-    # --------------------------------------------------------
+    # ========================================================
     # SAVE EVERYTHING
-    # --------------------------------------------------------
+    # ========================================================
 
     db.commit()
 
-    # --------------------------------------------------------
+    # ========================================================
     # FINAL RESPONSE
-    # --------------------------------------------------------
+    # ========================================================
 
     return AttemptResultResponse(
         attempt_id=attempt.id,
@@ -590,5 +645,5 @@ def submit_attempt(
         status=attempt.status,
         xp_earned=xp_earned,
         current_xp=current_user.xp,
-        current_level=current_user.level
+        current_level=current_user.level,
     )

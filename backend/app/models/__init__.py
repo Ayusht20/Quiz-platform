@@ -12,3 +12,5 @@ from app.models.badge import Badge
 from app.models.user_badge import UserBadge
 from app.models.xp_transaction import XPTransaction
 from app.models.skill_progress import SkillProgress
+from app.models.quest import Quest
+from app.models.user_quest import UserQuest
