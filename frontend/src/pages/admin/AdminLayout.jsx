@@ -8,10 +8,10 @@ import {
   BarChart3,
   LogOut,
   Shield,
+  Target,
 } from "lucide-react";
 
 import { useAuth } from "../../context/AuthContext";
-
 
 const navigation = [
   {
@@ -30,6 +30,11 @@ const navigation = [
     icon: Swords,
   },
   {
+    label: "Quests",
+    path: "/admin/quests",
+    icon: Target,
+  },
+  {
     label: "Users",
     path: "/admin/users",
     icon: Users,
@@ -45,7 +50,6 @@ const navigation = [
     icon: BarChart3,
   },
 ];
-
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -83,7 +87,6 @@ export default function AdminLayout() {
 
         </div>
 
-
         {/* NAVIGATION */}
 
         <nav className="flex-1 space-y-1 px-3 py-6">
@@ -111,7 +114,6 @@ export default function AdminLayout() {
 
         </nav>
 
-
         {/* USER */}
 
         <div className="border-t border-[var(--border)] p-4">
@@ -136,7 +138,6 @@ export default function AdminLayout() {
 
           </div>
 
-
           <button
             onClick={handleLogout}
             className="flex w-full items-center gap-3 px-4 py-3 text-xs font-black uppercase tracking-wider text-[var(--muted)] transition hover:bg-red-500/10 hover:text-red-400"
@@ -148,7 +149,6 @@ export default function AdminLayout() {
         </div>
 
       </aside>
-
 
       {/* MOBILE TOP BAR */}
 
@@ -175,13 +175,10 @@ export default function AdminLayout() {
 
       </div>
 
-
       {/* CONTENT */}
 
       <main className="min-w-0 flex-1 pt-16 lg:pt-0">
-
         <Outlet />
-
       </main>
 
     </div>

@@ -7,10 +7,8 @@ import {
 
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import SkillTree from "./pages/student/SkillTree";
+
 import ProtectedRoute from "./components/ProtectedRoute";
-import Quests from "./pages/student/Quests";
-// import SkillTree from "./pages/student/SkillTree";
 
 // ============================================================
 // AUTH
@@ -26,6 +24,8 @@ import Register from "./pages/auth/Register";
 import Dashboard from "./pages/student/Dashboard";
 import Practice from "./pages/student/Practice";
 import Battle from "./pages/student/Battle";
+import SkillTree from "./pages/student/SkillTree";
+import Quests from "./pages/student/Quests";
 
 // ============================================================
 // ADMIN
@@ -33,17 +33,24 @@ import Battle from "./pages/student/Battle";
 
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
+
 import Assessments from "./pages/admin/Assessments";
 import CreateAssessment from "./pages/admin/CreateAssessment";
 import AssessmentDetails from "./pages/admin/AssessmentDetails";
+
 import Questions from "./pages/admin/Questions";
 import QuestionEditor from "./pages/admin/QuestionEditor";
+
+import AdminQuests from "./pages/admin/Quests";
+import CreateQuest from "./pages/admin/CreateQuest";
 
 
 function App() {
   return (
     <BrowserRouter>
+
       <ThemeProvider>
+
         <AuthProvider>
 
           <Routes>
@@ -82,6 +89,8 @@ function App() {
             {/* STUDENT ROUTES */}
             {/* ================================================= */}
 
+            {/* DASHBOARD */}
+
             <Route
               path="/dashboard"
               element={
@@ -90,14 +99,10 @@ function App() {
                 </ProtectedRoute>
               }
             />
-              <Route
-  path="/quests"
-  element={
-    <ProtectedRoute role="STUDENT">
-      <Quests />
-    </ProtectedRoute>
-  }
-/>
+
+
+            {/* PRACTICE / BATTLES */}
+
             <Route
               path="/practice"
               element={
@@ -115,25 +120,34 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+
+            {/* SKILL TREE */}
+
             <Route
-  path="/skills"
-  element={
-    <ProtectedRoute role="STUDENT">
-      <SkillTree />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/skills"
-  element={
-    <ProtectedRoute role="STUDENT">
-      <SkillTree />
-    </ProtectedRoute>
-  }
-/>
+              path="/skills"
+              element={
+                <ProtectedRoute role="STUDENT">
+                  <SkillTree />
+                </ProtectedRoute>
+              }
+            />
+
+
+            {/* QUESTS */}
+
+            <Route
+              path="/quests"
+              element={
+                <ProtectedRoute role="STUDENT">
+                  <Quests />
+                </ProtectedRoute>
+              }
+            />
+
 
             {/* ================================================= */}
-            {/* ADMIN */}
+            {/* ADMIN ROUTES */}
             {/* ================================================= */}
 
             <Route
@@ -183,6 +197,7 @@ function App() {
                 }
               />
 
+
               {/* CREATE QUESTION */}
 
               <Route
@@ -215,14 +230,34 @@ function App() {
               />
 
 
-              {/* =============================================== */}
               {/* MANAGE BATTLE */}
-              {/* =============================================== */}
 
               <Route
                 path="assessments/:assessmentId"
                 element={
                   <AssessmentDetails />
+                }
+              />
+
+
+              {/* =============================================== */}
+              {/* QUEST MANAGEMENT */}
+              {/* =============================================== */}
+
+              <Route
+                path="quests"
+                element={
+                  <AdminQuests />
+                }
+              />
+
+
+              {/* CREATE QUEST */}
+
+              <Route
+                path="quests/create"
+                element={
+                  <CreateQuest />
                 }
               />
 
@@ -246,9 +281,12 @@ function App() {
           </Routes>
 
         </AuthProvider>
+
       </ThemeProvider>
+
     </BrowserRouter>
   );
 }
+
 
 export default App;

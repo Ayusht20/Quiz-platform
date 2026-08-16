@@ -8,21 +8,49 @@ const api = axios.create({
   },
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access_token");
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access_token");
+// ============================================================
+// REQUEST INTERCEPTOR
+// ============================================================
 
-  if (token) {
-    config.headers = config.headers || {};
-    config.headers.Authorization = `Bearer ${token}`;
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("access_token");
+
+    if (token) {
+      config.headers = config.headers || {};
+
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
+);
 
-  return config;
-});
 
-  return config;
-});
+// ============================================================
+// RESPONSE INTERCEPTOR
+// ============================================================
+
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  (error) => {
+    /*
+     * IMPORTANT:
+     * Do NOT automatically remove the token here.
+     *
+     * A single 401 should not immediately destroy
+     * the user's login session.
+     */
+
+    return Promise.reject(error);
+  }
+);
+
 
 export default api;
