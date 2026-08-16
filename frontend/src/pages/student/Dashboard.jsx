@@ -9,7 +9,7 @@ import {
   Target,
   Star,
 } from "lucide-react";
-import { Link } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 
 import Sidebar from "../../components/Sidebar";
@@ -110,6 +110,7 @@ const achievements = [
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const xp = user?.xp ?? 0;
   const level = user?.level ?? 1;
@@ -493,6 +494,7 @@ export default function Dashboard() {
                   whileTap={{
                     scale: 0.97,
                   }}
+                  onClick={() => navigate("/practice")}
                   className="mt-8 flex items-center gap-3 bg-[var(--primary)] px-6 py-3.5 text-xs font-black uppercase tracking-wide text-white shadow-lg shadow-blue-500/20"
                 >
 
@@ -674,13 +676,19 @@ export default function Dashboard() {
                   Progression
                 </p>
 
-<Link to="/skills">
-  Skill Tree
-</Link>
+<Link
+                  to="/skills"
+                  className="text-xl font-black transition hover:text-[var(--primary)]"
+                >
+                  Skill Tree
+                </Link>
 
               </div>
 
-              <button className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-[var(--primary)]">
+              <button
+                onClick={() => navigate("/skills")}
+                className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-[var(--primary)]"
+              >
                 Open Tree
                 <ChevronRight size={14} />
               </button>
@@ -768,6 +776,78 @@ export default function Dashboard() {
               </div>
 
             </div>
+
+          </section>
+
+          {/* QUESTS */}
+
+          <section className="mt-12">
+
+            <div className="mb-6 flex items-end justify-between">
+
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
+                  Daily Progress
+                </p>
+
+                <h2 className="mt-1 text-xl font-black">
+                  Quests
+                </h2>
+
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Complete challenges to earn bonus XP.
+                </p>
+              </div>
+
+              <Link
+                to="/quests"
+                className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-[var(--primary)]"
+              >
+                View Quests
+                <ChevronRight size={14} />
+              </Link>
+
+            </div>
+
+            <motion.div
+              whileHover={{ y: -3 }}
+              className="relative overflow-hidden border border-[var(--border)] bg-[var(--surface)] p-7"
+            >
+
+              <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[var(--primary)]/10 blur-3xl" />
+
+              <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
+
+                <div className="flex items-start gap-4">
+
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-[var(--primary-soft)] text-[var(--primary)]">
+                    <Target size={21} />
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-black">
+                      Complete your active quests
+                    </p>
+
+                    <p className="mt-1 max-w-xl text-xs leading-5 text-[var(--muted)]">
+                      Battle, answer questions and earn bonus XP
+                      while progressing through SkillArena.
+                    </p>
+                  </div>
+
+                </div>
+
+                <Link
+                  to="/quests"
+                  className="flex shrink-0 items-center justify-center gap-2 bg-[var(--primary)] px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white transition hover:brightness-110"
+                >
+                  Open Quests
+                  <ArrowUpRight size={15} />
+                </Link>
+
+              </div>
+
+            </motion.div>
 
           </section>
 
