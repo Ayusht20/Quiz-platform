@@ -58,15 +58,13 @@ def get_skills(
 # IMPORTANT:
 # This MUST appear BEFORE /{skill_id}
 #
-# Otherwise FastAPI will interpret:
+# Otherwise:
 #
 # /skills/progress
 #
-# as:
+# could be interpreted as:
 #
 # /skills/{skill_id}
-#
-# and try to convert "progress" into an integer.
 # ============================================================
 
 @router.get(
@@ -87,6 +85,8 @@ def get_my_skill_progress(
             SkillProgress.questions_answered,
             SkillProgress.questions_correct,
             SkillProgress.battles_completed,
+            SkillProgress.completed,
+            SkillProgress.mastered,
         )
         .join(
             Category,
@@ -125,7 +125,13 @@ def get_my_skill_progress(
             questions_answered,
             questions_correct,
             battles_completed,
+            completed,
+            mastered,
         ) = row
+
+        # --------------------------------------------------------
+        # Defaults for users who don't have a SkillProgress row yet
+        # --------------------------------------------------------
 
         xp = xp or 0
 
@@ -141,17 +147,32 @@ def get_my_skill_progress(
             battles_completed or 0
         )
 
-        # --------------------------------------------
+        completed = (
+            completed or False
+        )
+
+        mastered = (
+            mastered or False
+        )
+
+        # --------------------------------------------------------
         # Accuracy
-        # --------------------------------------------
+        # --------------------------------------------------------
 
         if questions_answered > 0:
+
             accuracy = (
                 questions_correct
                 / questions_answered
             ) * 100
+
         else:
+
             accuracy = 0
+
+        # --------------------------------------------------------
+        # Response
+        # --------------------------------------------------------
 
         result.append(
             {
@@ -159,17 +180,26 @@ def get_my_skill_progress(
                 "skill_name": skill_name,
                 "category_id": category_id,
                 "category_name": category_name,
+
                 "xp": xp,
+
                 "questions_answered":
                     questions_answered,
+
                 "questions_correct":
                     questions_correct,
+
                 "battles_completed":
                     battles_completed,
+
                 "accuracy": round(
                     accuracy,
                     2,
                 ),
+
+                "completed": completed,
+
+                "mastered": mastered,
             }
         )
 
@@ -217,9 +247,10 @@ def create_skill(
     db: Session = Depends(get_db),
     _: object = Depends(require_admin),
 ):
-    # --------------------------------------------
+
+    # --------------------------------------------------------
     # Check category
-    # --------------------------------------------
+    # --------------------------------------------------------
 
     category = db.get(
         Category,
@@ -227,14 +258,15 @@ def create_skill(
     )
 
     if not category:
+
         raise HTTPException(
             status_code=404,
             detail="Category not found",
         )
 
-    # --------------------------------------------
+    # --------------------------------------------------------
     # Check duplicate skill name
-    # --------------------------------------------
+    # --------------------------------------------------------
 
     existing_skill = db.scalar(
         select(Skill).where(
@@ -245,14 +277,15 @@ def create_skill(
     )
 
     if existing_skill:
+
         raise HTTPException(
             status_code=400,
             detail="Skill already exists",
         )
 
-    # --------------------------------------------
+    # --------------------------------------------------------
     # Create
-    # --------------------------------------------
+    # --------------------------------------------------------
 
     skill = Skill(
         category_id=data.category_id,
@@ -261,7 +294,9 @@ def create_skill(
     )
 
     db.add(skill)
+
     db.commit()
+
     db.refresh(skill)
 
     return skill
@@ -281,20 +316,22 @@ def update_skill(
     db: Session = Depends(get_db),
     _: object = Depends(require_admin),
 ):
+
     skill = db.get(
         Skill,
         skill_id,
     )
 
     if not skill:
+
         raise HTTPException(
             status_code=404,
             detail="Skill not found",
         )
 
-    # --------------------------------------------
+    # --------------------------------------------------------
     # Update name
-    # --------------------------------------------
+    # --------------------------------------------------------
 
     if data.name is not None:
 
@@ -310,6 +347,7 @@ def update_skill(
         )
 
         if existing_skill:
+
             raise HTTPException(
                 status_code=400,
                 detail="Skill already exists",
@@ -317,16 +355,18 @@ def update_skill(
 
         skill.name = new_name
 
-    # --------------------------------------------
+    # --------------------------------------------------------
     # Update description
-    # --------------------------------------------
+    # --------------------------------------------------------
 
     if data.description is not None:
+
         skill.description = (
             data.description
         )
 
     db.commit()
+
     db.refresh(skill)
 
     return skill
