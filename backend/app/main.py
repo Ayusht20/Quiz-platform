@@ -17,6 +17,8 @@ from app.api.routes.assessments import router as assessments_router
 from app.api.routes.leaderboard import router as leaderboard_router
 from app.api.routes.attempts import router as attempts_router
 from app.api.routes.quests import router as quests_router
+from app.api.routes.badges import router as badges_router
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -64,6 +66,10 @@ app.include_router(
 )
 app.include_router(
     quests_router,
+    prefix="/api",
+)
+app.include_router(
+    badges_router,
     prefix="/api",
 )
 app.include_router(attempts_router,prefix="/api")
