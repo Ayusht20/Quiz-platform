@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowUpRight,
   Flame,
@@ -7,6 +8,7 @@ import {
   ChevronRight,
   LockKeyhole,
   Target,
+  CheckCircle2,
   Star,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -16,36 +18,23 @@ import Sidebar from "../../components/Sidebar";
 import ThemeToggle from "../../components/ThemeToggle";
 import { useAuth } from "../../context/AuthContext";
 
-const skills = [
-  {
-    name: "JavaScript",
-    short: "JS",
-    progress: 82,
-    color: "var(--primary)",
-    unlocked: true,
-  },
-  {
-    name: "React",
-    short: "RE",
-    progress: 64,
-    color: "var(--violet)",
-    unlocked: true,
-  },
-  {
-    name: "Python",
-    short: "PY",
-    progress: 48,
-    color: "var(--cyan)",
-    unlocked: true,
-  },
-  {
-    name: "Node.js",
-    short: "ND",
-    progress: 22,
-    color: "var(--orange)",
-    unlocked: false,
-  },
+import { getMyQuests } from "../../services/questService";
+import { getMySkillProgress } from "../../services/skillService";
+
+// ============================================================
+// FALLBACK COLORS
+// ============================================================
+
+const skillColors = [
+  "var(--primary)",
+  "var(--violet)",
+  "var(--cyan)",
+  "var(--orange)",
 ];
+
+// ============================================================
+// STATIC DEMO DATA
+// ============================================================
 
 const battles = [
   {
@@ -79,68 +68,267 @@ const leaderboard = [
     name: "Priya",
     xp: 4890,
   },
-  {
-    rank: 126,
-    name: "Ayush",
-    xp: 4210,
-    current: true,
-  },
 ];
 
-const achievements = [
-  {
-    icon: "⚡",
-    title: "First Blood",
-    text: "Complete your first battle",
-    unlocked: true,
-  },
-  {
-    icon: "🔥",
-    title: "On Fire",
-    text: "Maintain a 7 day streak",
-    unlocked: false,
-  },
-  {
-    icon: "◆",
-    title: "Code Master",
-    text: "Reach 5,000 XP",
-    unlocked: false,
-  },
-];
+// ============================================================
+// DASHBOARD
+// ============================================================
 
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // ==========================================================
+  // STATE
+  // ==========================================================
+
+  const [skillProgress, setSkillProgress] = useState([]);
+  const [quests, setQuests] = useState([]);
+
+  const [loadingSkills, setLoadingSkills] = useState(true);
+  const [loadingQuests, setLoadingQuests] = useState(true);
+
+  // ==========================================================
+  // USER
+  // ==========================================================
+
   const xp = user?.xp ?? 0;
   const level = user?.level ?? 1;
 
+  const firstName =
+    user?.name?.split(" ")[0] || "Player";
+
+  // ==========================================================
+  // XP PROGRESS
+  // ==========================================================
+
   const xpIntoLevel = xp % 1000;
+
   const xpProgress = Math.min(
     (xpIntoLevel / 1000) * 100,
     100
   );
 
-  const firstName =
-    user?.name?.split(" ")[0] || "Player";
+  // ==========================================================
+  // LOAD SKILL PROGRESS
+  // ==========================================================
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSkills = async () => {
+      try {
+        setLoadingSkills(true);
+
+        const data = await getMySkillProgress();
+
+        if (!cancelled) {
+          setSkillProgress(
+            Array.isArray(data)
+              ? data
+              : []
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load skill progress:",
+          error
+        );
+
+        if (!cancelled) {
+          setSkillProgress([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingSkills(false);
+        }
+      }
+    };
+
+    loadSkills();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ==========================================================
+  // LOAD QUESTS
+  // ==========================================================
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadQuests = async () => {
+      try {
+        setLoadingQuests(true);
+
+        const data = await getMyQuests();
+
+        if (!cancelled) {
+          setQuests(
+            Array.isArray(data)
+              ? data
+              : []
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load quests:",
+          error
+        );
+
+        if (!cancelled) {
+          setQuests([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingQuests(false);
+        }
+      }
+    };
+
+    loadQuests();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ==========================================================
+  // NORMALIZE SKILL DATA
+  // ==========================================================
+
+  const skills = useMemo(() => {
+    return skillProgress
+      .slice(0, 4)
+      .map((skill, index) => {
+        const name =
+          skill.skill_name ||
+          skill.name ||
+          skill.skill?.name ||
+          `Skill ${index + 1}`;
+
+        const answered =
+          skill.questions_answered ?? 0;
+
+        const correct =
+          skill.questions_correct ?? 0;
+
+        const progress =
+          skill.progress ??
+          skill.percentage ??
+          (
+            answered > 0
+              ? Math.round(
+                  (correct / answered) * 100
+                )
+              : 0
+          );
+
+        const completed =
+          skill.completed ?? false;
+
+        const mastered =
+          skill.mastered ?? false;
+
+        return {
+          id:
+            skill.skill_id ??
+            skill.skill?.id ??
+            index,
+
+          name,
+
+          short: name
+            .split(" ")
+            .map((word) => word[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase(),
+
+          progress: Math.min(
+            Math.max(progress, 0),
+            100
+          ),
+
+          completed,
+          mastered,
+
+          unlocked:
+            completed ||
+            answered > 0 ||
+            progress > 0,
+
+          color:
+            skillColors[
+              index % skillColors.length
+            ],
+        };
+      });
+  }, [skillProgress]);
+
+  // ==========================================================
+  // QUEST SUMMARY
+  // ==========================================================
+
+  const activeQuests = useMemo(() => {
+    return quests.filter(
+      (quest) =>
+        !quest.completed &&
+        !quest.reward_claimed
+    );
+  }, [quests]);
+
+  const featuredQuest =
+    activeQuests[0] ||
+    quests[0] ||
+    null;
+
+  // ==========================================================
+  // QUEST PROGRESS %
+  // ==========================================================
+
+  const questProgress = featuredQuest
+    ? Math.min(
+        (
+          featuredQuest.progress /
+          Math.max(
+            featuredQuest.target_value,
+            1
+          )
+        ) * 100,
+        100
+      )
+    : 0;
+
+  // ==========================================================
+  // RENDER
+  // ==========================================================
 
   return (
     <div className="arena-background min-h-screen bg-[var(--bg)] text-[var(--text)]">
 
       <Sidebar />
 
+      {/* ====================================================== */}
       {/* MOBILE HEADER */}
+      {/* ====================================================== */}
 
       <div className="flex h-16 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-5 lg:hidden">
 
         <div className="flex items-center gap-2">
 
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--primary)] text-white">
-            <Zap size={16} fill="currentColor" />
+            <Zap
+              size={16}
+              fill="currentColor"
+            />
           </div>
 
           <span className="text-sm font-black">
-            SKILL<span className="text-[var(--primary)]">
+            SKILL
+            <span className="text-[var(--primary)]">
               ARENA
             </span>
           </span>
@@ -151,9 +339,15 @@ export default function Dashboard() {
 
       </div>
 
+      {/* ====================================================== */}
+      {/* MAIN */}
+      {/* ====================================================== */}
+
       <main className="lg:ml-[245px]">
 
+        {/* ==================================================== */}
         {/* TOP HUD */}
+        {/* ==================================================== */}
 
         <header className="hidden h-[76px] items-center justify-between border-b border-[var(--border)] bg-[var(--surface)]/80 px-10 backdrop-blur-md lg:flex">
 
@@ -231,7 +425,7 @@ export default function Dashboard() {
               <div>
 
                 <p className="text-xs font-black">
-                  #126
+                  —
                 </p>
 
                 <p className="text-[8px] uppercase tracking-wider text-[var(--muted)]">
@@ -245,18 +439,24 @@ export default function Dashboard() {
             <div className="h-7 w-px bg-[var(--border)]" />
 
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-black text-[var(--primary)]">
-              {user?.name?.charAt(0)?.toUpperCase() || "U"}
+              {user?.name
+                ?.charAt(0)
+                ?.toUpperCase() || "U"}
             </div>
 
           </div>
 
         </header>
 
+        {/* ==================================================== */}
         {/* PAGE */}
+        {/* ==================================================== */}
 
         <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-7 lg:px-10 lg:py-10">
 
+          {/* ================================================== */}
           {/* HERO */}
+          {/* ================================================== */}
 
           <motion.section
             initial={{
@@ -286,8 +486,8 @@ export default function Dashboard() {
                 </h1>
 
                 <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--muted)]">
-                  Sharpen your skills, defeat challenges and
-                  climb the global ranks.
+                  Sharpen your skills, defeat challenges
+                  and climb the global ranks.
                 </p>
 
               </div>
@@ -326,7 +526,9 @@ export default function Dashboard() {
                       }}
                       animate={{
                         strokeDashoffset:
-                          270 - (270 * xpProgress) / 100,
+                          270 -
+                          (270 * xpProgress) /
+                            100,
                       }}
                       transition={{
                         duration: 1.2,
@@ -339,7 +541,10 @@ export default function Dashboard() {
                   <div className="text-center">
 
                     <p className="text-2xl font-black">
-                      {String(level).padStart(2, "0")}
+                      {String(level).padStart(
+                        2,
+                        "0"
+                      )}
                     </p>
 
                     <p className="text-[7px] font-black uppercase tracking-wider text-[var(--muted)]">
@@ -357,8 +562,9 @@ export default function Dashboard() {
                   </p>
 
                   <p className="mt-1 text-lg font-black">
-                    {xpIntoLevel}{" "}
+                    {xpIntoLevel}
                     <span className="text-sm font-medium text-[var(--muted)]">
+                      {" "}
                       / 1000 XP
                     </span>
                   </p>
@@ -388,7 +594,9 @@ export default function Dashboard() {
 
           </motion.section>
 
+          {/* ================================================== */}
           {/* DAILY BATTLE */}
+          {/* ================================================== */}
 
           <motion.section
             initial={{
@@ -406,22 +614,6 @@ export default function Dashboard() {
             className="relative overflow-hidden border border-[var(--border)] bg-[var(--surface)]"
           >
 
-            {/* animated scan line */}
-
-            <motion.div
-              animate={{
-                x: ["-100%", "200%"],
-              }}
-              transition={{
-                duration: 5,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-              className="absolute left-0 top-0 h-px w-1/2 bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent opacity-50"
-            />
-
-            {/* decorative glow */}
-
             <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-[var(--primary)]/10 blur-3xl" />
 
             <div className="relative grid lg:grid-cols-[1fr_330px]">
@@ -437,11 +629,11 @@ export default function Dashboard() {
                   <div>
 
                     <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--primary)]">
-                      Daily Battle
+                      Battle Arena
                     </p>
 
                     <p className="text-[9px] uppercase tracking-wider text-[var(--muted)]">
-                      Recommended challenge
+                      Choose your next challenge
                     </p>
 
                   </div>
@@ -449,138 +641,80 @@ export default function Dashboard() {
                 </div>
 
                 <h2 className="mt-8 max-w-2xl text-3xl font-black tracking-tight sm:text-4xl">
-                  JavaScript
+                  Ready to test your
                   <span className="text-[var(--primary)]">
-                    {" "}Array Mastery
+                    {" "}skills?
                   </span>
                 </h2>
 
                 <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]">
-                  Put your JavaScript fundamentals to the
-                  test. Master arrays, methods and practical
-                  problem solving.
+                  Enter the arena, complete battles,
+                  earn XP and progress through your
+                  skill tree.
                 </p>
 
-                <div className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-3">
-
-                  <span className="text-xs font-semibold text-[var(--muted)]">
-                    <strong className="text-[var(--text)]">
-                      10
-                    </strong>{" "}
-                    Questions
-                  </span>
-
-                  <span className="text-xs font-semibold text-[var(--muted)]">
-                    <strong className="text-[var(--text)]">
-                      08
-                    </strong>{" "}
-                    Minutes
-                  </span>
-
-                  <span className="text-xs font-black text-[var(--cyan)]">
-                    +150 XP
-                  </span>
-
-                  <span className="text-xs font-black text-[var(--violet)]">
-                    Level 03
-                  </span>
-
-                </div>
-
-                <motion.button
-                  whileHover={{
-                    scale: 1.025,
-                  }}
-                  whileTap={{
-                    scale: 0.97,
-                  }}
-                  onClick={() => navigate("/practice")}
+                <button
+                  onClick={() =>
+                    navigate("/practice")
+                  }
                   className="mt-8 flex items-center gap-3 bg-[var(--primary)] px-6 py-3.5 text-xs font-black uppercase tracking-wide text-white shadow-lg shadow-blue-500/20"
                 >
-
                   Enter Arena
-
                   <ArrowUpRight size={16} />
-
-                </motion.button>
+                </button>
 
               </div>
-
-              {/* BATTLE PREVIEW */}
 
               <div className="border-t border-[var(--border)] bg-[var(--surface-soft)]/50 p-7 lg:border-l lg:border-t-0">
 
                 <div className="mb-5 flex items-center justify-between">
 
                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
-                    Battle Intel
+                    Progress Intel
                   </p>
 
                   <span className="h-2 w-2 rounded-full bg-[var(--success)] shadow-[0_0_12px_var(--success)]" />
 
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-5">
 
                   <div>
 
-                    <div className="mb-2 flex justify-between text-[10px]">
+                    <p className="text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
+                      Active Quests
+                    </p>
 
-                      <span className="text-[var(--muted)]">
-                        Difficulty
-                      </span>
-
-                      <span className="font-bold text-[var(--orange)]">
-                        Intermediate
-                      </span>
-
-                    </div>
-
-                    <div className="flex gap-1">
-
-                      {[1, 2, 3, 4, 5].map((item) => (
-                        <div
-                          key={item}
-                          className={`h-1.5 flex-1 ${
-                            item <= 3
-                              ? "bg-[var(--orange)]"
-                              : "bg-[var(--border)]"
-                          }`}
-                        />
-                      ))}
-
-                    </div>
+                    <p className="mt-2 text-2xl font-black">
+                      {loadingQuests
+                        ? "..."
+                        : activeQuests.length}
+                    </p>
 
                   </div>
 
                   <div className="border-t border-[var(--border)] pt-4">
 
                     <p className="text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
-                      Your previous best
+                      Skills Tracked
                     </p>
 
-                    <div className="mt-2 flex items-end justify-between">
-
-                      <p className="text-2xl font-black">
-                        86%
-                      </p>
-
-                      <p className="text-xs font-bold text-[var(--success)]">
-                        +12% improvement
-                      </p>
-
-                    </div>
+                    <p className="mt-2 text-2xl font-black">
+                      {loadingSkills
+                        ? "..."
+                        : skillProgress.length}
+                    </p>
 
                   </div>
 
                   <div className="border-t border-[var(--border)] pt-4">
 
                     <p className="text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
-                      Players completed
+                      Current Level
                     </p>
 
-                    <p className="mt-2 text-lg font-black">
-                      12,482
+                    <p className="mt-2 text-2xl font-black">
+                      {level}
                     </p>
 
                   </div>
@@ -593,36 +727,43 @@ export default function Dashboard() {
 
           </motion.section>
 
-          {/* STATS STRIP */}
+          {/* ================================================== */}
+          {/* STATS */}
+          {/* ================================================== */}
 
           <section className="mt-5 grid grid-cols-2 border-y border-[var(--border)] sm:grid-cols-4">
 
             {[
               {
-                label: "Battles",
-                value: "24",
-                icon: Swords,
-                color: "var(--primary)",
-              },
-              {
-                label: "Avg. Score",
-                value: "78%",
-                icon: Target,
+                label: "XP",
+                value: xp.toLocaleString(),
+                icon: Zap,
                 color: "var(--cyan)",
               },
               {
-                label: "Streak",
-                value: "7 Days",
-                icon: Flame,
-                color: "var(--orange)",
+                label: "Level",
+                value: level,
+                icon: Star,
+                color: "var(--violet)",
               },
               {
-                label: "Global Rank",
-                value: "#126",
+                label: "Active Quests",
+                value: loadingQuests
+                  ? "..."
+                  : activeQuests.length,
+                icon: Target,
+                color: "var(--primary)",
+              },
+              {
+                label: "Skills",
+                value: loadingSkills
+                  ? "..."
+                  : skillProgress.length,
                 icon: Trophy,
                 color: "var(--gold)",
               },
             ].map((stat, index) => {
+
               const Icon = stat.icon;
 
               return (
@@ -664,7 +805,9 @@ export default function Dashboard() {
 
           </section>
 
+          {/* ================================================== */}
           {/* SKILL TREE */}
+          {/* ================================================== */}
 
           <section className="mt-12">
 
@@ -676,7 +819,7 @@ export default function Dashboard() {
                   Progression
                 </p>
 
-<Link
+                <Link
                   to="/skills"
                   className="text-xl font-black transition hover:text-[var(--primary)]"
                 >
@@ -686,7 +829,9 @@ export default function Dashboard() {
               </div>
 
               <button
-                onClick={() => navigate("/skills")}
+                onClick={() =>
+                  navigate("/skills")
+                }
                 className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-[var(--primary)]"
               >
                 Open Tree
@@ -697,95 +842,163 @@ export default function Dashboard() {
 
             <div className="relative overflow-hidden border border-[var(--border)] bg-[var(--surface)] p-7 sm:p-10">
 
-              {/* TREE CONNECTION */}
+              {loadingSkills ? (
 
-              <div className="absolute left-[15%] right-[15%] top-1/2 hidden h-px bg-gradient-to-r from-[var(--primary)] via-[var(--violet)] to-[var(--cyan)] opacity-30 md:block" />
+                <div className="py-12 text-center text-sm font-bold text-[var(--muted)]">
+                  Loading skill progress...
+                </div>
 
-              <div className="relative grid grid-cols-2 gap-10 md:grid-cols-4">
+              ) : skills.length === 0 ? (
 
-                {skills.map((skill, index) => (
-                  <motion.div
-                    key={skill.name}
-                    initial={{
-                      opacity: 0,
-                      scale: 0.8,
-                    }}
-                    whileInView={{
-                      opacity: 1,
-                      scale: 1,
-                    }}
-                    viewport={{
-                      once: true,
-                    }}
-                    transition={{
-                      delay: index * 0.1,
-                    }}
-                    className="relative flex flex-col items-center text-center"
-                  >
+                <div className="py-12 text-center">
 
-                    <motion.div
-                      whileHover={{
-                        scale: 1.08,
-                      }}
-                      className="relative flex h-20 w-20 items-center justify-center border-2 bg-[var(--surface)]"
-                      style={{
-                        borderColor: skill.unlocked
-                          ? skill.color
-                          : "var(--border)",
-                      }}
-                    >
+                  <LockKeyhole
+                    size={30}
+                    className="mx-auto text-[var(--muted)]"
+                  />
 
-                      <div
-                        className="absolute inset-1 opacity-10"
-                        style={{
-                          background: skill.color,
-                        }}
-                      />
+                  <p className="mt-4 text-sm font-black">
+                    No skill progress yet
+                  </p>
 
-                      {skill.unlocked ? (
-                        <span
-                          className="relative text-lg font-black"
-                          style={{
-                            color: skill.color,
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Complete a battle to start
+                    building your skill tree.
+                  </p>
+
+                </div>
+
+              ) : (
+
+                <>
+
+                  <div className="absolute left-[15%] right-[15%] top-1/2 hidden h-px bg-gradient-to-r from-[var(--primary)] via-[var(--violet)] to-[var(--cyan)] opacity-30 md:block" />
+
+                  <div className="relative grid grid-cols-2 gap-10 md:grid-cols-4">
+
+                    {skills.map(
+                      (skill, index) => (
+
+                        <motion.div
+                          key={skill.id}
+                          initial={{
+                            opacity: 0,
+                            scale: 0.8,
                           }}
+                          whileInView={{
+                            opacity: 1,
+                            scale: 1,
+                          }}
+                          viewport={{
+                            once: true,
+                          }}
+                          transition={{
+                            delay:
+                              index * 0.1,
+                          }}
+                          className="relative flex flex-col items-center text-center"
                         >
-                          {skill.short}
-                        </span>
-                      ) : (
-                        <LockKeyhole
-                          size={20}
-                          className="relative text-[var(--muted)]"
-                        />
-                      )}
 
-                    </motion.div>
+                          <motion.div
+                            whileHover={{
+                              scale: 1.08,
+                            }}
+                            className="relative flex h-20 w-20 items-center justify-center border-2 bg-[var(--surface)]"
+                            style={{
+                              borderColor:
+                                skill.unlocked
+                                  ? skill.color
+                                  : "var(--border)",
+                            }}
+                          >
 
-                    <p className="mt-4 text-sm font-black">
-                      {skill.name}
-                    </p>
+                            <div
+                              className="absolute inset-1 opacity-10"
+                              style={{
+                                background:
+                                  skill.color,
+                              }}
+                            />
 
-                    <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                      {skill.unlocked
-                        ? `${skill.progress}% mastered`
-                        : "Locked"}
-                    </p>
+                            {skill.unlocked ? (
 
-                  </motion.div>
-                ))}
+                              <span
+                                className="relative text-lg font-black"
+                                style={{
+                                  color:
+                                    skill.color,
+                                }}
+                              >
+                                {skill.short}
+                              </span>
 
-              </div>
+                            ) : (
+
+                              <LockKeyhole
+                                size={20}
+                                className="relative text-[var(--muted)]"
+                              />
+
+                            )}
+
+                          </motion.div>
+
+                          <p className="mt-4 text-sm font-black">
+                            {skill.name}
+                          </p>
+
+                          <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-[var(--muted)]">
+
+                            {skill.mastered ? (
+                              <span className="text-[var(--success)]">
+                                Mastered
+                              </span>
+                            ) : skill.completed ? (
+                              `${skill.progress}% progress`
+                            ) : (
+                              `${skill.progress}%`
+                            )}
+
+                          </p>
+
+                          <div className="mt-2 h-1 w-20 overflow-hidden rounded-full bg-[var(--surface-soft)]">
+
+                            <div
+                              className="h-full"
+                              style={{
+                                width: `${skill.progress}%`,
+                                background:
+                                  skill.color,
+                              }}
+                            />
+
+                          </div>
+
+                        </motion.div>
+
+                      )
+                    )}
+
+                  </div>
+
+                </>
+
+              )}
 
             </div>
 
           </section>
 
+          {/* ================================================== */}
           {/* QUESTS */}
+          {/* ================================================== */}
 
           <section className="mt-12">
 
             <div className="mb-6 flex items-end justify-between">
 
               <div>
+
                 <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
                   Daily Progress
                 </p>
@@ -797,6 +1010,7 @@ export default function Dashboard() {
                 <p className="mt-1 text-sm text-[var(--muted)]">
                   Complete challenges to earn bonus XP.
                 </p>
+
               </div>
 
               <Link
@@ -809,49 +1023,133 @@ export default function Dashboard() {
 
             </div>
 
-            <motion.div
-              whileHover={{ y: -3 }}
-              className="relative overflow-hidden border border-[var(--border)] bg-[var(--surface)] p-7"
-            >
+            {loadingQuests ? (
 
-              <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[var(--primary)]/10 blur-3xl" />
+              <div className="border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-sm font-bold text-[var(--muted)]">
+                Loading quests...
+              </div>
 
-              <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
+            ) : !featuredQuest ? (
 
-                <div className="flex items-start gap-4">
+              <div className="border border-[var(--border)] bg-[var(--surface)] p-10 text-center">
 
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-[var(--primary-soft)] text-[var(--primary)]">
-                    <Target size={21} />
+                <Target
+                  size={30}
+                  className="mx-auto text-[var(--muted)]"
+                />
+
+                <p className="mt-4 text-sm font-black">
+                  No active quests
+                </p>
+
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  New challenges will appear here.
+                </p>
+
+              </div>
+
+            ) : (
+
+              <motion.div
+                whileHover={{
+                  y: -3,
+                }}
+                className="relative overflow-hidden border border-[var(--border)] bg-[var(--surface)] p-7"
+              >
+
+                <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[var(--primary)]/10 blur-3xl" />
+
+                <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
+
+                  <div className="flex items-start gap-4">
+
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-[var(--primary-soft)] text-[var(--primary)]">
+
+                      {featuredQuest.completed ? (
+                        <CheckCircle2 size={21} />
+                      ) : (
+                        <Target size={21} />
+                      )}
+
+                    </div>
+
+                    <div>
+
+                      <p className="text-sm font-black">
+                        {featuredQuest.title}
+                      </p>
+
+                      <p className="mt-1 max-w-xl text-xs leading-5 text-[var(--muted)]">
+                        {featuredQuest.description ||
+                          "Complete this quest to earn bonus XP."}
+                      </p>
+
+                      <div className="mt-4 w-full max-w-md">
+
+                        <div className="mb-2 flex items-center justify-between">
+
+                          <span className="text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
+                            Progress
+                          </span>
+
+                          <span className="text-[10px] font-black">
+                            {featuredQuest.progress}
+                            {" / "}
+                            {featuredQuest.target_value}
+                          </span>
+
+                        </div>
+
+                        <div className="h-2 overflow-hidden bg-[var(--surface-soft)]">
+
+                          <motion.div
+                            initial={{
+                              width: 0,
+                            }}
+                            animate={{
+                              width: `${questProgress}%`,
+                            }}
+                            transition={{
+                              duration: 0.8,
+                            }}
+                            className="h-full bg-[var(--primary)]"
+                          />
+
+                        </div>
+
+                      </div>
+
+                    </div>
+
                   </div>
 
-                  <div>
-                    <p className="text-sm font-black">
-                      Complete your active quests
-                    </p>
+                  <div className="flex shrink-0 flex-col items-start gap-3 md:items-end">
 
-                    <p className="mt-1 max-w-xl text-xs leading-5 text-[var(--muted)]">
-                      Battle, answer questions and earn bonus XP
-                      while progressing through SkillArena.
-                    </p>
+                    <span className="text-xs font-black text-[var(--cyan)]">
+                      +{featuredQuest.reward_xp} XP
+                    </span>
+
+                    <Link
+                      to="/quests"
+                      className="flex items-center justify-center gap-2 border border-[var(--border)] px-5 py-3 text-[10px] font-black uppercase tracking-wider transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                    >
+                      Open Quests
+                      <ArrowUpRight size={15} />
+                    </Link>
+
                   </div>
 
                 </div>
 
-                <Link
-                  to="/quests"
-                  className="flex shrink-0 items-center justify-center gap-2 bg-[var(--primary)] px-5 py-3 text-[10px] font-black uppercase tracking-wider text-white transition hover:brightness-110"
-                >
-                  Open Quests
-                  <ArrowUpRight size={15} />
-                </Link>
+              </motion.div>
 
-              </div>
-
-            </motion.div>
+            )}
 
           </section>
 
+          {/* ================================================== */}
           {/* LOWER CONTENT */}
+          {/* ================================================== */}
 
           <section className="mt-12 grid gap-10 xl:grid-cols-[1.3fr_1fr]">
 
@@ -873,55 +1171,62 @@ export default function Dashboard() {
 
                 </div>
 
-                <button className="text-[10px] font-black uppercase tracking-wider text-[var(--primary)]">
-                  History
+                <button
+                  onClick={() =>
+                    navigate("/practice")
+                  }
+                  className="text-[10px] font-black uppercase tracking-wider text-[var(--primary)]"
+                >
+                  Arena
                 </button>
 
               </div>
 
               <div className="border-y border-[var(--border)]">
 
-                {battles.map((battle, index) => (
-                  <motion.div
-                    key={battle.title}
-                    whileHover={{
-                      x: 4,
-                    }}
-                    className="flex items-center gap-4 border-b border-[var(--border)] py-5 last:border-0"
-                  >
+                {battles.map(
+                  (battle) => (
 
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-[var(--surface-soft)] text-[var(--primary)]">
+                    <motion.div
+                      key={battle.title}
+                      whileHover={{
+                        x: 4,
+                      }}
+                      className="flex items-center gap-4 border-b border-[var(--border)] py-5 last:border-0"
+                    >
 
-                      <Swords size={17} />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-[var(--surface-soft)] text-[var(--primary)]">
+                        <Swords size={17} />
+                      </div>
 
-                    </div>
+                      <div className="min-w-0 flex-1">
 
-                    <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black">
+                          {battle.title}
+                        </p>
 
-                      <p className="truncate text-sm font-black">
-                        {battle.title}
-                      </p>
+                        <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                          {battle.category}
+                        </p>
 
-                      <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-[var(--muted)]">
-                        {battle.category}
-                      </p>
+                      </div>
 
-                    </div>
+                      <div className="text-right">
 
-                    <div className="text-right">
+                        <p className="text-sm font-black text-[var(--success)]">
+                          {battle.score}
+                        </p>
 
-                      <p className="text-sm font-black text-[var(--success)]">
-                        {battle.score}
-                      </p>
+                        <p className="mt-1 text-[9px] font-black text-[var(--cyan)]">
+                          {battle.xp} XP
+                        </p>
 
-                      <p className="mt-1 text-[9px] font-black text-[var(--cyan)]">
-                        {battle.xp} XP
-                      </p>
+                      </div>
 
-                    </div>
+                    </motion.div>
 
-                  </motion.div>
-                ))}
+                  )
+                )}
 
               </div>
 
@@ -954,56 +1259,56 @@ export default function Dashboard() {
 
               <div className="border-y border-[var(--border)]">
 
-                {leaderboard.map((player) => (
-                  <motion.div
-                    key={player.rank}
-                    whileHover={{
-                      x: 4,
-                    }}
-                    className={`flex items-center gap-3 border-b border-[var(--border)] px-2 py-4 last:border-0 ${
-                      player.current
-                        ? "bg-[var(--primary-soft)]"
-                        : ""
-                    }`}
-                  >
+                {leaderboard.map(
+                  (player) => (
 
-                    <span className="w-8 text-center text-xs font-black text-[var(--muted)]">
-                      {player.rank}
-                    </span>
+                    <motion.div
+                      key={player.rank}
+                      whileHover={{
+                        x: 4,
+                      }}
+                      className="flex items-center gap-3 border-b border-[var(--border)] px-2 py-4 last:border-0"
+                    >
 
-                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-soft)] text-[10px] font-black">
-                      {player.name.charAt(0)}
-                    </div>
+                      <span className="w-8 text-center text-xs font-black text-[var(--muted)]">
+                        {player.rank}
+                      </span>
 
-                    <div className="flex-1">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-soft)] text-[10px] font-black">
+                        {player.name.charAt(0)}
+                      </div>
+
+                      <div className="flex-1">
+
+                        <p className="text-xs font-black">
+                          {player.name}
+                        </p>
+
+                      </div>
 
                       <p className="text-xs font-black">
-                        {player.name}
+                        {player.xp.toLocaleString()}
 
-                        {player.current && (
-                          <span className="ml-2 text-[8px] uppercase tracking-wider text-[var(--primary)]">
-                            You
-                          </span>
-                        )}
+                        <span className="ml-1 text-[8px] text-[var(--muted)]">
+                          XP
+                        </span>
 
                       </p>
 
-                    </div>
+                    </motion.div>
 
-                    <p className="text-xs font-black">
-                      {player.xp.toLocaleString()}
-                      <span className="ml-1 text-[8px] text-[var(--muted)]">
-                        XP
-                      </span>
-                    </p>
-
-                  </motion.div>
-                ))}
+                  )
+                )}
 
               </div>
 
-              <button className="mt-4 flex w-full items-center justify-center gap-2 border border-[var(--border)] py-3 text-[9px] font-black uppercase tracking-wider text-[var(--muted)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]">
-                View Full Leaderboard
+              <button
+                onClick={() =>
+                  navigate("/practice")
+                }
+                className="mt-4 flex w-full items-center justify-center gap-2 border border-[var(--border)] py-3 text-[9px] font-black uppercase tracking-wider text-[var(--muted)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+              >
+                Continue Learning
                 <ChevronRight size={13} />
               </button>
 
@@ -1011,7 +1316,9 @@ export default function Dashboard() {
 
           </section>
 
+          {/* ================================================== */}
           {/* ACHIEVEMENTS */}
+          {/* ================================================== */}
 
           <section className="mt-12 pb-10">
 
@@ -1029,39 +1336,74 @@ export default function Dashboard() {
 
             <div className="grid gap-3 md:grid-cols-3">
 
-              {achievements.map((achievement, index) => (
-                <motion.div
-                  key={achievement.title}
-                  whileHover={{
-                    y: -3,
-                  }}
-                  className={`flex items-center gap-4 border p-5 ${
-                    achievement.unlocked
-                      ? "border-[var(--border)] bg-[var(--surface)]"
-                      : "border-[var(--border)] bg-[var(--surface-soft)] opacity-60"
-                  }`}
-                >
+              {quests
+                .filter(
+                  (quest) =>
+                    quest.completed
+                )
+                .slice(0, 3)
+                .map((quest) => (
 
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-[var(--surface-soft)] text-xl">
-                    {achievement.unlocked
-                      ? achievement.icon
-                      : "🔒"}
+                  <motion.div
+                    key={quest.id}
+                    whileHover={{
+                      y: -3,
+                    }}
+                    className="flex items-center gap-4 border border-[var(--border)] bg-[var(--surface)] p-5"
+                  >
+
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-[var(--surface-soft)] text-xl">
+                      🏆
+                    </div>
+
+                    <div>
+
+                      <p className="text-xs font-black">
+                        {quest.title}
+                      </p>
+
+                      <p className="mt-1 text-[9px] leading-4 text-[var(--muted)]">
+                        Quest completed · +
+                        {quest.reward_xp} XP
+                      </p>
+
+                    </div>
+
+                  </motion.div>
+
+                ))}
+
+              {quests.filter(
+                (quest) =>
+                  quest.completed
+              ).length === 0 && (
+
+                <div className="border border-[var(--border)] bg-[var(--surface)] p-5 md:col-span-3">
+
+                  <div className="flex items-center gap-4">
+
+                    <div className="flex h-12 w-12 items-center justify-center bg-[var(--surface-soft)] text-xl">
+                      🏆
+                    </div>
+
+                    <div>
+
+                      <p className="text-xs font-black">
+                        Your achievements will appear here
+                      </p>
+
+                      <p className="mt-1 text-[9px] leading-4 text-[var(--muted)]">
+                        Complete quests and challenges
+                        to build your collection.
+                      </p>
+
+                    </div>
+
                   </div>
 
-                  <div>
+                </div>
 
-                    <p className="text-xs font-black">
-                      {achievement.title}
-                    </p>
-
-                    <p className="mt-1 text-[9px] leading-4 text-[var(--muted)]">
-                      {achievement.text}
-                    </p>
-
-                  </div>
-
-                </motion.div>
-              ))}
+              )}
 
             </div>
 
