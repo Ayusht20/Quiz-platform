@@ -26,6 +26,7 @@ import Practice from "./pages/student/Practice";
 import Battle from "./pages/student/Battle";
 import SkillTree from "./pages/student/SkillTree";
 import Quests from "./pages/student/Quests";
+import Achievements from "./pages/student/Achievements";
 
 // ============================================================
 // ADMIN
@@ -144,7 +145,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
+<Route
+  path="/badges"
+  element={
+    <ProtectedRoute role="STUDENT">
+      <Achievements />
+    </ProtectedRoute>
+  }
+/>
 
             {/* ================================================= */}
             {/* ADMIN ROUTES */}
