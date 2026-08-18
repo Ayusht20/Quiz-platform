@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -30,10 +38,34 @@ class Assessment(Base):
         default="ASSESSMENT",
     )
 
+    # Skill used for automatic question selection
+    skill_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "skills.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    # Optional topic filter
+    topic: Mapped[str | None] = mapped_column(
+        String(150),
+        nullable=True,
+        index=True,
+    )
+
     difficulty: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
         default="BEGINNER",
+    )
+
+    # Number of questions automatically selected
+    question_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=10,
     )
 
     duration_minutes: Mapped[int] = mapped_column(
@@ -69,6 +101,10 @@ class Assessment(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+    skill = relationship(
+        "Skill",
     )
 
     assessment_questions = relationship(
