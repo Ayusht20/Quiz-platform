@@ -207,6 +207,29 @@ def get_my_skill_progress(
 
 
 # ============================================================
+# GET AVAILABLE SKILLS - STUDENT
+# ============================================================
+
+@router.get(
+    "/available",
+    response_model=list[SkillResponse],
+)
+def get_available_skills(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_student),
+):
+    skills = db.scalars(
+        select(Skill)
+        .where(
+            Skill.is_active.is_(True)
+        )
+        .order_by(
+            Skill.name.asc()
+        )
+    ).all()
+
+    return skills
+# ============================================================
 # GET SINGLE SKILL
 # ============================================================
 

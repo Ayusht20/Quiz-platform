@@ -19,90 +19,111 @@ import {
 } from "../../services/practiceService";
 
 import { getAssessments } from "../../services/assessmentService";
+import { getAvailableSkills } from "../../services/skillService";
 
 
 export default function Practice() {
   const navigate = useNavigate();
 
-  const [questions, setQuestions] = useState([]);
+  const [skills, setSkills] = useState([]);
   const [assessments, setAssessments] = useState([]);
 
+  const [selectedSkill, setSelectedSkill] = useState("");
+  const [difficulty, setDifficulty] = useState("");
+
+  const [questions, setQuestions] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+
   const [selectedOption, setSelectedOption] = useState(null);
   const [result, setResult] = useState(null);
 
   const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
   const [checking, setChecking] = useState(false);
+
   const [error, setError] = useState("");
 
+  const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
   const [correctCount, setCorrectCount] = useState(0);
 
 
   // ============================================================
-  // LOAD PRACTICE QUESTIONS
+  // INITIAL LOAD
   // ============================================================
-
-  const loadPractice = async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      const data = await getPracticeQuestions({
-        limit: 10,
-      });
-
-      setQuestions(data || []);
-      setCurrentIndex(0);
-      setSelectedOption(null);
-      setResult(null);
-      setFinished(false);
-      setCorrectCount(0);
-    } catch (err) {
-      console.error(
-        "Failed to load practice questions:",
-        err
-      );
-
-      setError(
-        "Unable to load practice questions."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  // ============================================================
-  // LOAD BATTLES
-  // ============================================================
-
-  const loadBattles = async () => {
-    try {
-      const data = await getAssessments();
-
-      setAssessments(data || []);
-    } catch (err) {
-      console.error(
-        "Failed to load battles:",
-        err
-      );
-    }
-  };
-
 
   useEffect(() => {
-    loadPractice();
-    loadBattles();
+    const loadInitialData = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [skillsData, battlesData] =
+          await Promise.all([
+            getAvailableSkills(),
+            getAssessments(),
+          ]);
+
+        setSkills(skillsData || []);
+        setAssessments(battlesData || []);
+      } catch (err) {
+        console.error(err);
+
+        setError(
+          "Unable to load practice data."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInitialData();
   }, []);
 
 
   // ============================================================
-  // CURRENT QUESTION
+  // START PRACTICE
   // ============================================================
 
-  const currentQuestion =
-    questions[currentIndex];
+  const startPractice = async () => {
+    try {
+      setStarting(true);
+      setError("");
+
+      const data =
+        await getPracticeQuestions({
+          skillId: selectedSkill
+            ? Number(selectedSkill)
+            : undefined,
+          difficulty:
+            difficulty || undefined,
+          limit: 10,
+        });
+
+      if (!data || data.length === 0) {
+        setError(
+          "No questions are available for this selection."
+        );
+        return;
+      }
+
+      setQuestions(data);
+      setCurrentIndex(0);
+      setSelectedOption(null);
+      setResult(null);
+      setCorrectCount(0);
+      setFinished(false);
+      setStarted(true);
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        "Unable to start practice."
+      );
+    } finally {
+      setStarting(false);
+    }
+  };
 
 
   // ============================================================
@@ -111,8 +132,8 @@ export default function Practice() {
 
   const handleCheckAnswer = async () => {
     if (
-      !currentQuestion ||
       !selectedOption ||
+      !questions[currentIndex] ||
       checking ||
       result
     ) {
@@ -124,7 +145,7 @@ export default function Practice() {
 
       const data =
         await checkPracticeAnswer(
-          currentQuestion.id,
+          questions[currentIndex].id,
           selectedOption
         );
 
@@ -136,10 +157,7 @@ export default function Practice() {
         );
       }
     } catch (err) {
-      console.error(
-        "Failed to check answer:",
-        err
-      );
+      console.error(err);
 
       setError(
         "Unable to check this answer."
@@ -151,7 +169,7 @@ export default function Practice() {
 
 
   // ============================================================
-  // NEXT QUESTION
+  // NEXT
   // ============================================================
 
   const handleNext = () => {
@@ -173,6 +191,22 @@ export default function Practice() {
 
 
   // ============================================================
+  // RESET
+  // ============================================================
+
+  const resetPractice = () => {
+    setStarted(false);
+    setFinished(false);
+    setQuestions([]);
+    setCurrentIndex(0);
+    setSelectedOption(null);
+    setResult(null);
+    setCorrectCount(0);
+    setError("");
+  };
+
+
+  // ============================================================
   // LOADING
   // ============================================================
 
@@ -183,9 +217,7 @@ export default function Practice() {
         <div className="text-center">
 
           <motion.div
-            animate={{
-              rotate: 360,
-            }}
+            animate={{ rotate: 360 }}
             transition={{
               duration: 1,
               repeat: Infinity,
@@ -206,46 +238,194 @@ export default function Practice() {
 
 
   // ============================================================
-  // ERROR
+  // PRACTICE SETUP
   // ============================================================
 
-  if (error && questions.length === 0) {
+  if (!started) {
     return (
-      <div className="min-h-screen bg-[var(--bg)] p-6 text-[var(--text)]">
+      <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
 
-        <button
-          onClick={() =>
-            navigate("/dashboard")
-          }
-          className="flex items-center gap-2 text-xs font-bold text-[var(--muted)]"
-        >
-          <ArrowLeft size={16} />
-          Dashboard
-        </button>
-
-        <div className="mx-auto mt-20 max-w-lg border border-[var(--danger)]/20 bg-[var(--surface)] p-10 text-center">
-
-          <CircleAlert
-            size={36}
-            className="mx-auto text-[var(--danger)]"
-          />
-
-          <h2 className="mt-5 text-lg font-black">
-            Practice unavailable
-          </h2>
-
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            {error}
-          </p>
+        <main className="mx-auto max-w-5xl px-5 py-8 lg:px-8 lg:py-12">
 
           <button
-            onClick={loadPractice}
-            className="mt-6 bg-[var(--primary)] px-5 py-3 text-xs font-black uppercase text-white"
+            onClick={() =>
+              navigate("/dashboard")
+            }
+            className="flex items-center gap-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--text)]"
           >
-            Try Again
+            <ArrowLeft size={16} />
+            Dashboard
           </button>
 
-        </div>
+
+          <section className="mt-12">
+
+            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[var(--primary)]">
+              Prepare Yourself
+            </p>
+
+            <h1 className="mt-2 text-4xl font-black">
+              Practice
+            </h1>
+
+            <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]">
+              Practice questions before entering an
+              official SkillArena battle.
+            </p>
+
+          </section>
+
+
+          {error && (
+            <div className="mt-8 border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-4 text-sm text-[var(--danger)]">
+              {error}
+            </div>
+          )}
+
+
+          <section className="mt-10 border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8">
+
+            <div className="grid gap-8 md:grid-cols-2">
+
+              {/* SKILL */}
+
+              <div>
+
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                  Choose Skill
+                </label>
+
+                <select
+                  value={selectedSkill}
+                  onChange={(event) =>
+                    setSelectedSkill(
+                      event.target.value
+                    )
+                  }
+                  className="mt-3 w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--primary)]"
+                >
+
+                  <option value="">
+                    All Skills
+                  </option>
+
+                  {skills.map((skill) => (
+                    <option
+                      key={skill.id}
+                      value={skill.id}
+                    >
+                      {skill.name}
+                    </option>
+                  ))}
+
+                </select>
+
+              </div>
+
+
+              {/* DIFFICULTY */}
+
+              <div>
+
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                  Difficulty
+                </label>
+
+                <select
+                  value={difficulty}
+                  onChange={(event) =>
+                    setDifficulty(
+                      event.target.value
+                    )
+                  }
+                  className="mt-3 w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm font-semibold outline-none focus:border-[var(--primary)]"
+                >
+
+                  <option value="">
+                    All Difficulties
+                  </option>
+
+                  <option value="EASY">
+                    Easy
+                  </option>
+
+                  <option value="MEDIUM">
+                    Medium
+                  </option>
+
+                  <option value="HARD">
+                    Hard
+                  </option>
+
+                </select>
+
+              </div>
+
+            </div>
+
+
+            {/* START */}
+
+            <button
+              onClick={startPractice}
+              disabled={starting}
+              className="mt-8 flex w-full items-center justify-center gap-2 bg-[var(--primary)] px-6 py-4 text-xs font-black uppercase tracking-wider text-white transition hover:brightness-110 disabled:opacity-50"
+            >
+
+              {starting
+                ? "Preparing..."
+                : "Start Practice"}
+
+              <ArrowRight size={16} />
+
+            </button>
+
+          </section>
+
+
+          {/* BATTLE */}
+
+          <section className="mt-8 border border-[var(--border)] bg-[var(--surface)] p-6">
+
+            <div className="flex items-center gap-3">
+
+              <Swords
+                size={20}
+                className="text-[var(--primary)]"
+              />
+
+              <div>
+
+                <h2 className="font-black">
+                  Ready for an official Battle?
+                </h2>
+
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  Practice first, then test yourself
+                  officially.
+                </p>
+
+              </div>
+
+            </div>
+
+            {assessments.length > 0 && (
+              <button
+                onClick={() =>
+                  navigate(
+                    `/practice/${assessments[0].id}`
+                  )
+                }
+                className="mt-5 flex items-center gap-2 border border-[var(--border)] px-5 py-3 text-xs font-black uppercase tracking-wider transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+              >
+                Enter Battle
+                <Swords size={14} />
+              </button>
+            )}
+
+          </section>
+
+        </main>
 
       </div>
     );
@@ -253,40 +433,92 @@ export default function Practice() {
 
 
   // ============================================================
-  // NO QUESTIONS
+  // FINISHED
   // ============================================================
 
-  if (questions.length === 0) {
+  if (finished) {
+    const accuracy =
+      Math.round(
+        (correctCount /
+          questions.length) *
+          100
+      );
+
     return (
       <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
 
-        <main className="mx-auto max-w-3xl px-5 py-10">
+        <main className="mx-auto max-w-4xl px-5 py-10 lg:py-16">
 
-          <button
-            onClick={() =>
-              navigate("/dashboard")
-            }
-            className="flex items-center gap-2 text-xs font-bold text-[var(--muted)]"
-          >
-            <ArrowLeft size={16} />
-            Dashboard
-          </button>
-
-          <div className="mt-16 border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
+          <div className="border border-[var(--border)] bg-[var(--surface)] p-8 text-center sm:p-12">
 
             <Trophy
-              size={38}
-              className="mx-auto text-[var(--muted)]"
+              size={42}
+              className="mx-auto text-[var(--primary)]"
             />
 
-            <h1 className="mt-5 text-xl font-black">
-              No practice questions yet
+            <p className="mt-5 text-[9px] font-black uppercase tracking-[0.3em] text-[var(--primary)]">
+              Practice Complete
+            </p>
+
+            <h1 className="mt-2 text-3xl font-black">
+              {correctCount}/{questions.length}
             </h1>
 
             <p className="mt-2 text-sm text-[var(--muted)]">
-              Ask the admin to add active questions
-              to the question bank.
+              Accuracy: {accuracy}%
             </p>
+
+
+            <div className="mt-8 h-2 bg-[var(--surface-soft)]">
+
+              <div
+                className="h-full bg-[var(--primary)]"
+                style={{
+                  width: `${accuracy}%`,
+                }}
+              />
+
+            </div>
+
+
+            <div className="mt-10 border border-[var(--primary)]/20 bg-[var(--primary-soft)] p-6">
+
+              <Swords
+                size={20}
+                className="mx-auto text-[var(--primary)]"
+              />
+
+              <h2 className="mt-3 font-black">
+                Ready for Battle?
+              </h2>
+
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                Put your preparation to the test.
+              </p>
+
+              {assessments.length > 0 && (
+                <button
+                  onClick={() =>
+                    navigate(
+                      `/practice/${assessments[0].id}`
+                    )
+                  }
+                  className="mt-5 bg-[var(--primary)] px-6 py-3 text-xs font-black uppercase tracking-wider text-white"
+                >
+                  Enter Battle
+                </button>
+              )}
+
+            </div>
+
+
+            <button
+              onClick={resetPractice}
+              className="mt-6 inline-flex items-center gap-2 border border-[var(--border)] px-5 py-3 text-xs font-black uppercase tracking-wider text-[var(--muted)]"
+            >
+              <RotateCcw size={14} />
+              Practice Again
+            </button>
 
           </div>
 
@@ -298,184 +530,25 @@ export default function Practice() {
 
 
   // ============================================================
-  // PRACTICE COMPLETE
+  // QUESTION
   // ============================================================
 
-  if (finished) {
-    return (
-      <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-
-        <main className="mx-auto max-w-4xl px-5 py-10 lg:py-16">
-
-          <button
-            onClick={() =>
-              navigate("/dashboard")
-            }
-            className="flex items-center gap-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--text)]"
-          >
-            <ArrowLeft size={16} />
-            Dashboard
-          </button>
-
-          <motion.div
-            initial={{
-              opacity: 0,
-              y: 20,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            className="mt-12 border border-[var(--border)] bg-[var(--surface)] p-8 text-center sm:p-12"
-          >
-
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
-
-              <Trophy size={38} />
-
-            </div>
-
-            <p className="mt-6 text-[9px] font-black uppercase tracking-[0.3em] text-[var(--primary)]">
-              Practice Complete
-            </p>
-
-            <h1 className="mt-2 text-3xl font-black">
-              Good work!
-            </h1>
-
-            <p className="mt-3 text-sm text-[var(--muted)]">
-              You answered{" "}
-              <span className="font-black text-[var(--text)]">
-                {correctCount}
-              </span>{" "}
-              out of{" "}
-              <span className="font-black text-[var(--text)]">
-                {questions.length}
-              </span>{" "}
-              questions correctly.
-            </p>
-
-
-            <div className="mx-auto mt-8 max-w-md">
-
-              <div className="mb-2 flex justify-between text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
-
-                <span>
-                  Accuracy
-                </span>
-
-                <span>
-                  {Math.round(
-                    (correctCount /
-                      questions.length) *
-                      100
-                  )}
-                  %
-                </span>
-
-              </div>
-
-              <div className="h-2 overflow-hidden bg-[var(--surface-soft)]">
-
-                <div
-                  className="h-full bg-[var(--primary)] transition-all"
-                  style={{
-                    width: `${
-                      (correctCount /
-                        questions.length) *
-                      100
-                    }%`,
-                  }}
-                />
-
-              </div>
-
-            </div>
-
-
-            {/* BATTLE CTA */}
-
-            <div className="mt-10 border border-[var(--primary)]/20 bg-[var(--primary-soft)] p-6">
-
-              <div className="flex items-center justify-center gap-2 text-[var(--primary)]">
-
-                <Swords size={18} />
-
-                <span className="text-xs font-black uppercase tracking-wider">
-                  Ready for Battle?
-                </span>
-
-              </div>
-
-              <p className="mt-2 text-xs text-[var(--muted)]">
-                Put your knowledge to the test in an
-                official SkillArena battle.
-              </p>
-
-
-              {assessments.length > 0 ? (
-
-                <button
-                  onClick={() =>
-                    navigate(
-                      `/practice/${assessments[0].id}`
-                    )
-                  }
-                  className="mt-5 inline-flex items-center gap-2 bg-[var(--primary)] px-6 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:brightness-110"
-                >
-                  Enter Battle
-                  <ArrowRight size={15} />
-                </button>
-
-              ) : (
-
-                <p className="mt-4 text-xs text-[var(--muted)]">
-                  No battles are currently available.
-                </p>
-
-              )}
-
-            </div>
-
-
-            <button
-              onClick={loadPractice}
-              className="mt-6 inline-flex items-center gap-2 border border-[var(--border)] px-5 py-3 text-xs font-black uppercase tracking-wider text-[var(--muted)] transition hover:text-[var(--text)]"
-            >
-              <RotateCcw size={14} />
-              Practice Again
-            </button>
-
-          </motion.div>
-
-        </main>
-
-      </div>
-    );
-  }
-
-
-  // ============================================================
-  // QUESTION SCREEN
-  // ============================================================
+  const question =
+    questions[currentIndex];
 
   return (
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
 
       <main className="mx-auto max-w-4xl px-5 py-8 lg:py-12">
 
-        {/* HEADER */}
-
         <div className="flex items-center justify-between">
 
           <button
-            onClick={() =>
-              navigate("/dashboard")
-            }
-            className="flex items-center gap-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--text)]"
+            onClick={resetPractice}
+            className="flex items-center gap-2 text-xs font-bold text-[var(--muted)]"
           >
             <ArrowLeft size={16} />
-            Dashboard
+            Practice Setup
           </button>
 
           <div className="flex items-center gap-2">
@@ -498,45 +571,29 @@ export default function Practice() {
 
         <div className="mt-10">
 
-          <div className="flex items-end justify-between">
+          <div className="flex justify-between text-xs font-black">
 
-            <div>
+            <span>
+              Question {currentIndex + 1}
+            </span>
 
-              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--primary)]">
-                Question {currentIndex + 1}
-              </p>
-
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                of {questions.length}
-              </p>
-
-            </div>
-
-            <span className="text-xs font-black text-[var(--muted)]">
-              {Math.round(
-                ((currentIndex + 1) /
-                  questions.length) *
-                  100
-              )}
-              %
+            <span className="text-[var(--muted)]">
+              {questions.length}
             </span>
 
           </div>
 
           <div className="mt-3 h-1.5 bg-[var(--surface-soft)]">
 
-            <motion.div
-              initial={{
-                width: 0,
-              }}
-              animate={{
+            <div
+              className="h-full bg-[var(--primary)]"
+              style={{
                 width: `${
                   ((currentIndex + 1) /
                     questions.length) *
                   100
                 }%`,
               }}
-              className="h-full bg-[var(--primary)]"
             />
 
           </div>
@@ -547,7 +604,7 @@ export default function Practice() {
         {/* QUESTION */}
 
         <motion.section
-          key={currentQuestion.id}
+          key={question.id}
           initial={{
             opacity: 0,
             y: 15,
@@ -559,15 +616,15 @@ export default function Practice() {
           className="mt-8 border border-[var(--border)] bg-[var(--surface)] p-6 sm:p-8"
         >
 
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex justify-between">
 
-            <span className="bg-[var(--primary-soft)] px-3 py-1.5 text-[9px] font-black uppercase tracking-wider text-[var(--primary)]">
-              {currentQuestion.difficulty}
+            <span className="bg-[var(--primary-soft)] px-3 py-1 text-[9px] font-black uppercase text-[var(--primary)]">
+              {question.difficulty}
             </span>
 
-            {currentQuestion.topic && (
-              <span className="text-[10px] font-bold text-[var(--muted)]">
-                {currentQuestion.topic}
+            {question.topic && (
+              <span className="text-[10px] text-[var(--muted)]">
+                {question.topic}
               </span>
             )}
 
@@ -575,29 +632,26 @@ export default function Practice() {
 
 
           <h1 className="mt-7 text-xl font-black leading-relaxed sm:text-2xl">
-            {currentQuestion.question_text}
+            {question.question_text}
           </h1>
 
 
-          {/* OPTIONS */}
-
           <div className="mt-8 space-y-3">
 
-            {currentQuestion.options.map(
+            {question.options.map(
               (option, index) => {
 
-                const isSelected =
-                  selectedOption ===
-                  option.id;
+                const selected =
+                  selectedOption === option.id;
 
-                const isCorrect =
+                const correct =
                   result &&
                   result.correct_option_id ===
                     option.id;
 
-                const isWrong =
+                const wrong =
                   result &&
-                  isSelected &&
+                  selected &&
                   !result.correct;
 
                 return (
@@ -610,39 +664,37 @@ export default function Practice() {
                       )
                     }
                     className={`flex w-full items-center gap-4 border p-4 text-left transition ${
-                      isCorrect
+                      correct
                         ? "border-[var(--success)] bg-[var(--success)]/10"
-                        : isWrong
+                        : wrong
                         ? "border-[var(--danger)] bg-[var(--danger)]/10"
-                        : isSelected
+                        : selected
                         ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-                        : "border-[var(--border)] hover:border-[var(--primary)]/50"
+                        : "border-[var(--border)] hover:border-[var(--primary)]"
                     }`}
                   >
 
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-[var(--border)] text-xs font-black">
-
                       {String.fromCharCode(
                         65 + index
                       )}
-
                     </span>
 
-                    <span className="flex-1 text-sm font-semibold">
+                    <span className="text-sm font-semibold">
                       {option.option_text}
                     </span>
 
-                    {isCorrect && (
+                    {correct && (
                       <CheckCircle2
                         size={18}
-                        className="text-[var(--success)]"
+                        className="ml-auto text-[var(--success)]"
                       />
                     )}
 
-                    {isWrong && (
+                    {wrong && (
                       <XCircle
                         size={18}
-                        className="text-[var(--danger)]"
+                        className="ml-auto text-[var(--danger)]"
                       />
                     )}
 
@@ -657,16 +709,7 @@ export default function Practice() {
           {/* RESULT */}
 
           {result && (
-
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: 8,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
+            <div
               className={`mt-6 border p-5 ${
                 result.correct
                   ? "border-[var(--success)]/20 bg-[var(--success)]/10"
@@ -688,63 +731,53 @@ export default function Practice() {
                   />
                 )}
 
-                <p className="text-sm font-black">
-
+                <span className="font-black">
                   {result.correct
                     ? "Correct!"
-                    : "Not quite!"}
-
-                </p>
+                    : "Incorrect"}
+                </span>
 
               </div>
 
               {result.explanation && (
-
                 <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
                   {result.explanation}
                 </p>
-
               )}
 
-            </motion.div>
-
+            </div>
           )}
 
-
-          {/* ACTION */}
 
           <div className="mt-7 flex justify-end">
 
             {!result ? (
-
               <button
-                disabled={!selectedOption || checking}
+                disabled={
+                  !selectedOption ||
+                  checking
+                }
                 onClick={handleCheckAnswer}
-                className="flex items-center gap-2 bg-[var(--primary)] px-6 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex items-center gap-2 bg-[var(--primary)] px-6 py-3 text-xs font-black uppercase text-white disabled:opacity-40"
               >
                 {checking
                   ? "Checking..."
                   : "Check Answer"}
 
                 <CheckCircle2 size={15} />
-
               </button>
-
             ) : (
-
               <button
                 onClick={handleNext}
-                className="flex items-center gap-2 bg-[var(--primary)] px-6 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:brightness-110"
+                className="flex items-center gap-2 bg-[var(--primary)] px-6 py-3 text-xs font-black uppercase text-white"
               >
                 {currentIndex ===
                 questions.length - 1
-                  ? "Finish Practice"
-                  : "Next Question"}
+                  ? "Finish"
+                  : "Next"}
 
                 <ArrowRight size={15} />
-
               </button>
-
             )}
 
           </div>
