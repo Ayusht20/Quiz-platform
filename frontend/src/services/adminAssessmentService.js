@@ -24,6 +24,78 @@ export const getAllAssessments = async () => {
 };
 
 
+export const getAssessment = async (
+  assessmentId
+) => {
+  const response = await api.get(
+    `/assessments/${assessmentId}`
+  );
+
+  return response.data;
+};
+
+
+// ============================================================
+// SKILLS
+// ============================================================
+
+export const getSkills = async () => {
+  const response = await api.get(
+    "/skills"
+  );
+
+  return response.data;
+};
+
+
+// ============================================================
+// TOPICS
+// ============================================================
+
+export const getAssessmentTopics = async (
+  skillId
+) => {
+  const response = await api.get(
+    `/assessments/available-topics/${skillId}`
+  );
+
+  return response.data;
+};
+
+
+// ============================================================
+// AVAILABLE QUESTION COUNT
+// ============================================================
+
+export const getAvailableQuestionCount = async ({
+  skillId,
+  topic = "",
+  difficulty = "",
+}) => {
+
+  const params = {
+    skill_id: skillId,
+  };
+
+  if (topic) {
+    params.topic = topic;
+  }
+
+  if (difficulty) {
+    params.difficulty = difficulty;
+  }
+
+  const response = await api.get(
+    "/assessments/available-count",
+    {
+      params,
+    }
+  );
+
+  return response.data;
+};
+
+
 // ============================================================
 // QUESTION BANK
 // ============================================================
@@ -31,6 +103,7 @@ export const getAllAssessments = async () => {
 export const getQuestions = async ({
   skillId = "",
   difficulty = "",
+  topic = "",
 } = {}) => {
 
   const params = {};
@@ -41,6 +114,10 @@ export const getQuestions = async ({
 
   if (difficulty) {
     params.difficulty = difficulty;
+  }
+
+  if (topic) {
+    params.topic = topic;
   }
 
   const response = await api.get(
@@ -54,7 +131,14 @@ export const getQuestions = async ({
 };
 
 
-export const createQuestion = async (data) => {
+// ============================================================
+// CREATE QUESTION
+// ============================================================
+
+export const createQuestion = async (
+  data
+) => {
+
   const response = await api.post(
     "/questions",
     data
@@ -64,17 +148,8 @@ export const createQuestion = async (data) => {
 };
 
 
-export const getSkills = async () => {
-  const response = await api.get(
-    "/skills"
-  );
-
-  return response.data;
-};
-
-
 // ============================================================
-// ADD QUESTION TO ASSESSMENT
+// MANUAL QUESTION ADDITION
 // ============================================================
 
 export const addQuestionToAssessment = async (
@@ -92,7 +167,24 @@ export const addQuestionToAssessment = async (
 
 
 // ============================================================
+// GET BATTLE QUESTIONS
+// ============================================================
+
+export const getAssessmentQuestions =
+  async (assessmentId) => {
+
+    const response = await api.get(
+      `/assessments/${assessmentId}/questions`
+    );
+
+    return response.data;
+  };
+
+
+// ============================================================
 // PUBLISH
+//
+// Backend automatically selects questions.
 // ============================================================
 
 export const publishAssessment = async (

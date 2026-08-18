@@ -1,33 +1,33 @@
 import {
   useEffect,
-  useMemo,
   useState,
 } from "react";
 
 import {
   ArrowLeft,
   ArrowRight,
-  Check,
   CheckCircle2,
   Clock3,
-  Filter,
   Layers3,
   Loader2,
-  Search,
   Swords,
+  Target,
   Trophy,
-  X,
 } from "lucide-react";
 
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  motion,
+} from "framer-motion";
 
-import { useNavigate } from "react-router-dom";
+import {
+  useNavigate,
+} from "react-router-dom";
 
 import {
   createAssessment,
-  getQuestions,
+  getAssessmentTopics,
+  getAvailableQuestionCount,
   getSkills,
-  addQuestionToAssessment,
 } from "../../services/adminAssessmentService";
 
 
@@ -37,77 +37,55 @@ export default function CreateAssessment() {
 
 
   // ============================================================
-  // STEP
+  // DATA
   // ============================================================
 
-  const [step, setStep] = useState(1);
+  const [skills, setSkills] =
+    useState([]);
+
+  const [topics, setTopics] =
+    useState([]);
 
 
   // ============================================================
-  // ASSESSMENT DETAILS
+  // FORM
   // ============================================================
 
   const [form, setForm] = useState({
     title: "",
     description: "",
-    assessment_type: "PRACTICE",
-    difficulty: "BEGINNER",
-    duration_minutes: 30,
+    assessment_type: "BATTLE",
+    skill_id: "",
+    topic: "",
+    difficulty: "EASY",
+    question_count: 10,
+    duration_minutes: 10,
     passing_percentage: 60,
     max_attempts: "",
   });
 
 
   // ============================================================
-  // QUESTION BANK
+  // STATES
   // ============================================================
-
-  const [questions, setQuestions] = useState([]);
-
-  const [skills, setSkills] = useState([]);
-
-  const [selectedQuestions, setSelectedQuestions] =
-    useState([]);
-
-
-  // ============================================================
-  // QUESTION FILTERS
-  // ============================================================
-
-  const [search, setSearch] = useState("");
-
-  const [skillFilter, setSkillFilter] =
-    useState("");
-
-  const [difficultyFilter, setDifficultyFilter] =
-    useState("");
-
-
-  // ============================================================
-  // LOADING
-  // ============================================================
-
-  const [loadingQuestions, setLoadingQuestions] =
-    useState(false);
 
   const [loadingSkills, setLoadingSkills] =
+    useState(true);
+
+  const [loadingTopics, setLoadingTopics] =
     useState(false);
+
+  const [checkingQuestions, setCheckingQuestions] =
+    useState(false);
+
+  const [availableQuestions, setAvailableQuestions] =
+    useState(null);
 
   const [saving, setSaving] =
     useState(false);
 
-
-  // ============================================================
-  // ERROR
-  // ============================================================
-
   const [error, setError] =
     useState("");
-
-
-  // ============================================================
-  // SUCCESS
-  // ============================================================
 
   const [success, setSuccess] =
     useState("");
@@ -125,15 +103,18 @@ export default function CreateAssessment() {
 
         setLoadingSkills(true);
 
-        const data = await getSkills();
+        const data =
+          await getSkills();
 
         setSkills(data || []);
 
       } catch (error) {
 
-        console.error(
-          "Failed to load skills:",
-          error
+        console.error(error);
+
+        setError(
+          error.response?.data?.detail ||
+          "Unable to load skills."
         );
 
       } finally {
@@ -150,300 +131,206 @@ export default function CreateAssessment() {
 
 
   // ============================================================
-  // LOAD QUESTIONS
+  // LOAD TOPICS WHEN SKILL CHANGES
   // ============================================================
 
   useEffect(() => {
 
-    if (step !== 2) {
+    if (!form.skill_id) {
+
+      setTopics([]);
+
+      setForm((previous) => ({
+        ...previous,
+        topic: "",
+      }));
+
       return;
     }
 
-    const loadQuestions = async () => {
+
+    const loadTopics = async () => {
 
       try {
 
-        setLoadingQuestions(true);
+        setLoadingTopics(true);
 
-        setError("");
+        const data =
+          await getAssessmentTopics(
+            form.skill_id
+          );
 
-        const data = await getQuestions({
-          skillId: skillFilter,
-          difficulty: difficultyFilter,
-        });
-
-        setQuestions(data || []);
+        setTopics(data || []);
 
       } catch (error) {
 
-        console.error(
-          "Failed to load question bank:",
-          error
-        );
+        console.error(error);
 
         setError(
           error.response?.data?.detail ||
-          "Failed to load question bank."
+          "Unable to load topics."
         );
 
       } finally {
 
-        setLoadingQuestions(false);
+        setLoadingTopics(false);
 
       }
 
     };
 
-    loadQuestions();
+    loadTopics();
 
   }, [
-    step,
-    skillFilter,
-    difficultyFilter,
+    form.skill_id,
   ]);
 
 
   // ============================================================
-  // FORM CHANGE
+  // CHECK AVAILABLE QUESTIONS
   // ============================================================
 
-  const handleChange = (event) => {
+  useEffect(() => {
 
-    const {
-      name,
-      value,
-    } = event.target;
+    if (!form.skill_id) {
+
+      setAvailableQuestions(null);
+
+      return;
+    }
+
+
+    const checkQuestions = async () => {
+
+      try {
+
+        setCheckingQuestions(true);
+
+        const data =
+          await getAvailableQuestionCount({
+            skillId: form.skill_id,
+            topic: form.topic,
+            difficulty: form.difficulty,
+          });
+
+        setAvailableQuestions(
+          data.available_questions
+        );
+
+      } catch (error) {
+
+        console.error(error);
+
+        setAvailableQuestions(null);
+
+      } finally {
+
+        setCheckingQuestions(false);
+
+      }
+
+    };
+
+    checkQuestions();
+
+  }, [
+    form.skill_id,
+    form.topic,
+    form.difficulty,
+  ]);
+
+
+  // ============================================================
+  // CHANGE FIELD
+  // ============================================================
+
+  const updateField = (
+    field,
+    value
+  ) => {
 
     setForm((previous) => ({
       ...previous,
-      [name]: value,
+      [field]: value,
     }));
 
-  };
-
-
-  // ============================================================
-  // SEARCH FILTER
-  // ============================================================
-
-  const filteredQuestions = useMemo(() => {
-
-    const query =
-      search.trim().toLowerCase();
-
-    if (!query) {
-      return questions;
-    }
-
-    return questions.filter(
-      (question) =>
-        question.question_text
-          ?.toLowerCase()
-          .includes(query) ||
-
-        question.topic
-          ?.toLowerCase()
-          .includes(query)
-    );
-
-  }, [
-    questions,
-    search,
-  ]);
-
-
-  // ============================================================
-  // SELECT / DESELECT
-  // ============================================================
-
-  const toggleQuestion = (question) => {
-
-    setSelectedQuestions(
-      (previous) => {
-
-        const exists = previous.some(
-          (item) =>
-            item.id === question.id
-        );
-
-        if (exists) {
-
-          return previous.filter(
-            (item) =>
-              item.id !== question.id
-          );
-
-        }
-
-        return [
-          ...previous,
-          question,
-        ];
-
-      }
-    );
+    setError("");
+    setSuccess("");
 
   };
 
 
   // ============================================================
-  // REMOVE SELECTED
+  // CREATE
   // ============================================================
 
-  const removeSelectedQuestion = (
-    questionId
+  const handleSubmit = async (
+    event
   ) => {
 
-    setSelectedQuestions(
-      (previous) =>
-        previous.filter(
-          (question) =>
-            question.id !== questionId
-        )
-    );
+    event.preventDefault();
 
-  };
+    setError("");
+    setSuccess("");
 
 
-  // ============================================================
-  // IS SELECTED
-  // ============================================================
+    // --------------------------------------------------------
+    // VALIDATION
+    // --------------------------------------------------------
 
-  const isSelected = (questionId) => {
-
-    return selectedQuestions.some(
-      (question) =>
-        question.id === questionId
-    );
-
-  };
-
-
-  // ============================================================
-  // STEP 1 VALIDATION
-  // ============================================================
-
-  const validateDetails = () => {
-
-    if (
-      !form.title.trim()
-    ) {
+    if (!form.title.trim()) {
 
       setError(
         "Battle title is required."
       );
 
-      return false;
-
+      return;
     }
 
+
+    if (!form.skill_id) {
+
+      setError(
+        "Select a skill."
+      );
+
+      return;
+    }
+
+
     if (
-      form.title.trim().length < 3
+      Number(form.question_count) <= 0
     ) {
 
       setError(
-        "Battle title must contain at least 3 characters."
+        "Question count must be greater than 0."
       );
 
-      return false;
-
+      return;
     }
 
+
     if (
-      Number(form.duration_minutes) < 1
+      availableQuestions !== null &&
+      Number(form.question_count)
+      > availableQuestions
     ) {
 
       setError(
-        "Duration must be at least 1 minute."
+        `Only ${availableQuestions} matching questions are available.`
       );
 
-      return false;
-
-    }
-
-    setError("");
-
-    return true;
-
-  };
-
-
-  // ============================================================
-  // NEXT STEP
-  // ============================================================
-
-  const nextStep = () => {
-
-    setError("");
-
-    if (step === 1) {
-
-      if (!validateDetails()) {
-        return;
-      }
-
-      setStep(2);
-
       return;
-
     }
 
-    if (step === 2) {
 
-      if (
-        selectedQuestions.length === 0
-      ) {
-
-        setError(
-          "Select at least one question for the battle."
-        );
-
-        return;
-
-      }
-
-      setStep(3);
-
-      return;
-
-    }
-
-  };
-
-
-  // ============================================================
-  // PREVIOUS STEP
-  // ============================================================
-
-  const previousStep = () => {
-
-    setError("");
-
-    if (step > 1) {
-      setStep(step - 1);
-    }
-
-  };
-
-
-  // ============================================================
-  // CREATE BATTLE
-  // ============================================================
-
-  const handleCreateBattle = async () => {
+    // --------------------------------------------------------
+    // CREATE
+    // --------------------------------------------------------
 
     try {
 
       setSaving(true);
-
-      setError("");
-
-      setSuccess("");
-
-
-      // ========================================================
-      // 1. CREATE ASSESSMENT
-      // ========================================================
 
       const assessment =
         await createAssessment({
@@ -452,65 +339,38 @@ export default function CreateAssessment() {
             form.title.trim(),
 
           description:
-            form.description.trim() ||
-            null,
+            form.description.trim()
+            || null,
 
           assessment_type:
             form.assessment_type,
 
+          skill_id:
+            Number(form.skill_id),
+
+          topic:
+            form.topic.trim()
+            || null,
+
           difficulty:
             form.difficulty,
 
+          question_count:
+            Number(form.question_count),
+
           duration_minutes:
-            Number(
-              form.duration_minutes
-            ),
+            Number(form.duration_minutes),
 
           passing_percentage:
-            Number(
-              form.passing_percentage
-            ),
+            Number(form.passing_percentage),
 
           max_attempts:
-            form.max_attempts === ""
-              ? null
-              : Number(
-                  form.max_attempts
-                ),
+            form.max_attempts
+              ? Number(form.max_attempts)
+              : null,
 
         });
 
-
-      // ========================================================
-      // 2. ATTACH QUESTIONS
-      // ========================================================
-
-      for (
-        let index = 0;
-        index < selectedQuestions.length;
-        index++
-      ) {
-
-        const question =
-          selectedQuestions[index];
-
-        await addQuestionToAssessment(
-          assessment.id,
-          {
-            question_id:
-              question.id,
-
-            question_order:
-              index + 1,
-          }
-        );
-
-      }
-
-
-      // ========================================================
-      // SUCCESS
-      // ========================================================
 
       setSuccess(
         "Battle created successfully."
@@ -523,19 +383,15 @@ export default function CreateAssessment() {
           `/admin/assessments/${assessment.id}`
         );
 
-      }, 800);
-
+      }, 700);
 
     } catch (error) {
 
-      console.error(
-        "Failed to create battle:",
-        error
-      );
+      console.error(error);
 
       setError(
         error.response?.data?.detail ||
-        "Failed to create battle."
+        "Unable to create battle."
       );
 
     } finally {
@@ -552,14 +408,12 @@ export default function CreateAssessment() {
   // ============================================================
 
   return (
-
     <div className="min-h-full bg-[var(--bg)] text-[var(--text)]">
 
-      <main className="mx-auto max-w-7xl px-5 py-8 lg:px-8">
+      <main className="mx-auto max-w-5xl px-5 py-8 lg:px-8">
 
-        {/* ================================================== */}
+
         {/* HEADER */}
-        {/* ================================================== */}
 
         <div className="flex items-center justify-between">
 
@@ -569,189 +423,76 @@ export default function CreateAssessment() {
                 "/admin/assessments"
               )
             }
-            className="flex items-center gap-2 text-sm font-semibold text-[var(--muted)] transition hover:text-[var(--text)]"
+            className="flex items-center gap-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--text)]"
           >
 
-            <ArrowLeft size={17} />
+            <ArrowLeft size={16} />
 
-            Assessments
+            Back to Battles
 
           </button>
 
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
 
-            <div className="flex h-11 w-11 items-center justify-center bg-[var(--primary-soft)] text-[var(--primary)]">
+            <Swords
+              size={18}
+              className="text-[var(--primary)]"
+            />
 
-              <Swords size={20} />
-
-            </div>
-
-            <div>
-
-              <p className="text-sm font-black tracking-[0.15em]">
-                SKILLARENA
-              </p>
-
-              <p className="text-[9px] font-bold tracking-[0.3em] text-[var(--muted)]">
-                ADMIN CONTROL
-              </p>
-
-            </div>
+            <span className="text-xs font-black uppercase tracking-[0.2em]">
+              Battle Builder
+            </span>
 
           </div>
 
         </div>
 
 
-        {/* ================================================== */}
         {/* TITLE */}
-        {/* ================================================== */}
 
-        <div className="mt-14">
+        <section className="mt-12">
 
-          <p className="text-[10px] font-black uppercase tracking-[0.35em] text-[var(--primary)]">
-            Battle Builder
+          <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[var(--primary)]">
+            Automatic Battle
           </p>
 
-          <h1 className="mt-3 text-4xl font-black tracking-tight lg:text-5xl">
-            Create a new battle
+          <h1 className="mt-2 text-4xl font-black">
+            Create Battle
           </h1>
 
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-            Build a challenge, select questions from
-            your question bank, review everything and
-            prepare it for students.
+            Configure the skill, topic, difficulty and
+            question count. SkillArena will automatically
+            build the battle from your question bank when
+            you publish it.
           </p>
 
-        </div>
+        </section>
 
 
-        {/* ================================================== */}
-        {/* STEPS */}
-        {/* ================================================== */}
-
-        <div className="mt-10 grid gap-3 md:grid-cols-3">
-
-          {[
-            {
-              number: 1,
-              title: "Details",
-            },
-            {
-              number: 2,
-              title: "Questions",
-            },
-            {
-              number: 3,
-              title: "Review",
-            },
-          ].map((item) => {
-
-            const active =
-              step === item.number;
-
-            const completed =
-              step > item.number;
-
-            return (
-
-              <div
-                key={item.number}
-                className={`flex items-center gap-4 border p-4 transition ${
-                  active
-                    ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-                    : completed
-                    ? "border-[var(--success)]/40 bg-[var(--surface)]"
-                    : "border-[var(--border)] bg-[var(--surface)]"
-                }`}
-              >
-
-                <div
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center font-black ${
-                    active
-                      ? "bg-[var(--primary)] text-white"
-                      : completed
-                      ? "bg-[var(--success)] text-white"
-                      : "bg-[var(--surface-soft)] text-[var(--muted)]"
-                  }`}
-                >
-
-                  {completed ? (
-                    <Check size={19} />
-                  ) : (
-                    `0${item.number}`
-                  )}
-
-                </div>
-
-                <div>
-
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
-                    Step {item.number}
-                  </p>
-
-                  <p className="mt-1 text-sm font-black">
-                    {item.title}
-                  </p>
-
-                </div>
-
-              </div>
-
-            );
-
-          })}
-
-        </div>
-
-
-        {/* ================================================== */}
         {/* ERROR */}
-        {/* ================================================== */}
 
-        <AnimatePresence>
+        {error && (
 
-          {error && (
+          <div className="mt-8 border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-4 text-sm text-[var(--danger)]">
 
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: -8,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              exit={{
-                opacity: 0,
-                y: -8,
-              }}
-              className="mt-6 flex items-center gap-3 border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400"
-            >
+            {error}
 
-              <X size={17} />
+          </div>
 
-              {typeof error === "string"
-                ? error
-                : "Something went wrong."}
-
-            </motion.div>
-
-          )}
-
-        </AnimatePresence>
+        )}
 
 
-        {/* ================================================== */}
         {/* SUCCESS */}
-        {/* ================================================== */}
 
         {success && (
 
-          <div className="mt-6 flex items-center gap-3 border border-[var(--success)]/20 bg-[var(--success)]/10 px-4 py-3 text-sm text-[var(--success)]">
+          <div className="mt-8 flex items-center gap-2 border border-[var(--success)]/30 bg-[var(--success)]/10 p-4 text-sm text-[var(--success)]">
 
-            <CheckCircle2 size={17} />
+            <CheckCircle2
+              size={17}
+            />
 
             {success}
 
@@ -760,934 +501,679 @@ export default function CreateAssessment() {
         )}
 
 
-        {/* ================================================== */}
-        {/* STEP CONTENT */}
-        {/* ================================================== */}
+        {/* FORM */}
 
-        <div className="mt-8">
+        <form
+          onSubmit={handleSubmit}
+          className="mt-8 space-y-6"
+        >
 
-          {/* ================================================= */}
-          {/* STEP 1 */}
-          {/* ================================================= */}
 
-          {step === 1 && (
+          {/* BASIC INFORMATION */}
 
-            <motion.div
-              initial={{
-                opacity: 0,
-                x: 15,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              className="border border-[var(--border)] bg-[var(--surface)] p-6 lg:p-8"
-            >
+          <motion.section
+            initial={{
+              opacity: 0,
+              y: 12,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            className="border border-[var(--border)] bg-[var(--surface)] p-6 lg:p-8"
+          >
 
-              <div className="mb-8">
+            <div className="flex items-center gap-3">
 
-                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--primary)]">
-                  Battle details
+              <div className="flex h-11 w-11 items-center justify-center bg-[var(--primary-soft)] text-[var(--primary)]">
+
+                <Swords size={19} />
+
+              </div>
+
+              <div>
+
+                <h2 className="font-black">
+                  Battle Information
+                </h2>
+
+                <p className="text-xs text-[var(--muted)]">
+                  Define the identity of the battle.
                 </p>
 
-                <h2 className="mt-2 text-xl font-black">
-                  Define your challenge
-                </h2>
+              </div>
+
+            </div>
+
+
+            <div className="mt-7 space-y-5">
+
+
+              {/* TITLE */}
+
+              <div>
+
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                  Battle Title
+                </label>
+
+                <input
+                  value={form.title}
+                  onChange={(event) =>
+                    updateField(
+                      "title",
+                      event.target.value
+                    )
+                  }
+                  placeholder="Python Arrays Challenge"
+                  className="mt-2 w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm outline-none focus:border-[var(--primary)]"
+                />
 
               </div>
 
 
-              <div className="space-y-6">
+              {/* DESCRIPTION */}
+
+              <div>
+
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                  Description
+                </label>
+
+                <textarea
+                  value={
+                    form.description
+                  }
+                  onChange={(event) =>
+                    updateField(
+                      "description",
+                      event.target.value
+                    )
+                  }
+                  rows={4}
+                  placeholder="Test your knowledge of Python arrays."
+                  className="mt-2 w-full resize-none border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm outline-none focus:border-[var(--primary)]"
+                />
+
+              </div>
+
+
+              {/* TYPE */}
+
+              <div className="grid gap-5 md:grid-cols-2">
 
                 <div>
 
-                  <label className="mb-2 block text-xs font-black uppercase tracking-wider">
-                    Battle title
+                  <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                    Battle Type
                   </label>
 
-                  <input
-                    name="title"
-                    value={form.title}
-                    onChange={handleChange}
-                    placeholder="e.g. JavaScript Advanced Arena"
-                    className="w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3.5 text-sm outline-none transition focus:border-[var(--primary)]"
-                  />
+                  <select
+                    value={
+                      form.assessment_type
+                    }
+                    onChange={(event) =>
+                      updateField(
+                        "assessment_type",
+                        event.target.value
+                      )
+                    }
+                    className="mt-2 w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm outline-none"
+                  >
+
+                    <option value="BATTLE">
+                      Battle
+                    </option>
+
+                    <option value="ASSESSMENT">
+                      Assessment
+                    </option>
+
+                    <option value="CHALLENGE">
+                      Challenge
+                    </option>
+
+                  </select>
 
                 </div>
 
 
                 <div>
 
-                  <label className="mb-2 block text-xs font-black uppercase tracking-wider">
-                    Description
-                  </label>
-
-                  <textarea
-                    name="description"
-                    value={form.description}
-                    onChange={handleChange}
-                    rows={4}
-                    placeholder="Describe what students will be challenged on..."
-                    className="w-full resize-none border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3.5 text-sm outline-none transition focus:border-[var(--primary)]"
-                  />
-
-                </div>
-
-
-                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-
-                  <div>
-
-                    <label className="mb-2 block text-xs font-black uppercase tracking-wider">
-                      Type
-                    </label>
-
-                    <select
-                      name="assessment_type"
-                      value={
-                        form.assessment_type
-                      }
-                      onChange={handleChange}
-                      className="w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3.5 text-sm outline-none"
-                    >
-
-                      <option value="PRACTICE">
-                        Practice
-                      </option>
-
-                      <option value="ASSESSMENT">
-                        Assessment
-                      </option>
-
-                      <option value="BATTLE">
-                        Battle
-                      </option>
-
-                    </select>
-
-                  </div>
-
-
-                  <div>
-
-                    <label className="mb-2 block text-xs font-black uppercase tracking-wider">
-                      Difficulty
-                    </label>
-
-                    <select
-                      name="difficulty"
-                      value={
-                        form.difficulty
-                      }
-                      onChange={handleChange}
-                      className="w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3.5 text-sm outline-none"
-                    >
-
-                      <option value="BEGINNER">
-                        Beginner
-                      </option>
-
-                      <option value="INTERMEDIATE">
-                        Intermediate
-                      </option>
-
-                      <option value="ADVANCED">
-                        Advanced
-                      </option>
-
-                    </select>
-
-                  </div>
-
-
-                  <div>
-
-                    <label className="mb-2 block text-xs font-black uppercase tracking-wider">
-                      Duration
-                    </label>
-
-                    <div className="relative">
-
-                      <Clock3
-                        size={15}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"
-                      />
-
-                      <input
-                        type="number"
-                        min="1"
-                        max="300"
-                        name="duration_minutes"
-                        value={
-                          form.duration_minutes
-                        }
-                        onChange={handleChange}
-                        className="w-full border border-[var(--border)] bg-[var(--surface-soft)] py-3.5 pl-10 pr-14 text-sm outline-none"
-                      />
-
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-[var(--muted)]">
-                        MIN
-                      </span>
-
-                    </div>
-
-                  </div>
-
-
-                  <div>
-
-                    <label className="mb-2 block text-xs font-black uppercase tracking-wider">
-                      Passing
-                    </label>
-
-                    <div className="relative">
-
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        name="passing_percentage"
-                        value={
-                          form.passing_percentage
-                        }
-                        onChange={handleChange}
-                        className="w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3.5 pr-10 text-sm outline-none"
-                      />
-
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)]">
-                        %
-                      </span>
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-
-                <div className="max-w-xs">
-
-                  <label className="mb-2 block text-xs font-black uppercase tracking-wider">
-                    Maximum attempts
+                  <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                    Maximum Attempts
                   </label>
 
                   <input
                     type="number"
                     min="1"
-                    name="max_attempts"
                     value={
                       form.max_attempts
                     }
-                    onChange={handleChange}
+                    onChange={(event) =>
+                      updateField(
+                        "max_attempts",
+                        event.target.value
+                      )
+                    }
                     placeholder="Unlimited"
-                    className="w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3.5 text-sm outline-none"
+                    className="mt-2 w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm outline-none"
                   />
 
                 </div>
 
               </div>
 
-            </motion.div>
-
-          )}
-
-
-          {/* ================================================= */}
-          {/* STEP 2 — QUESTION BANK */}
-          {/* ================================================= */}
-
-          {step === 2 && (
-
-            <motion.div
-              initial={{
-                opacity: 0,
-                x: 15,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-            >
-
-              <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-
-                {/* QUESTION BANK */}
-
-                <div className="border border-[var(--border)] bg-[var(--surface)]">
-
-                  <div className="border-b border-[var(--border)] p-6">
-
-                    <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-
-                      <div>
-
-                        <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--primary)]">
-                          Question Bank
-                        </p>
-
-                        <h2 className="mt-2 text-xl font-black">
-                          Choose your questions
-                        </h2>
-
-                      </div>
-
-                      <div className="flex items-center gap-2 bg-[var(--primary-soft)] px-4 py-2 text-xs font-black text-[var(--primary)]">
-
-                        <Layers3 size={15} />
-
-                        {selectedQuestions.length}
-                        {" "}
-                        selected
-
-                      </div>
-
-                    </div>
-
-
-                    {/* FILTERS */}
-
-                    <div className="mt-6 grid gap-3 md:grid-cols-[1fr_180px_150px]">
-
-                      <div className="relative">
-
-                        <Search
-                          size={16}
-                          className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"
-                        />
-
-                        <input
-                          value={search}
-                          onChange={(event) =>
-                            setSearch(
-                              event.target.value
-                            )
-                          }
-                          placeholder="Search questions or topics..."
-                          className="w-full border border-[var(--border)] bg-[var(--surface-soft)] py-3 pl-10 pr-4 text-sm outline-none focus:border-[var(--primary)]"
-                        />
-
-                      </div>
-
-
-                      <select
-                        value={skillFilter}
-                        onChange={(event) =>
-                          setSkillFilter(
-                            event.target.value
-                          )
-                        }
-                        className="border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-3 text-sm outline-none"
-                      >
-
-                        <option value="">
-                          All skills
-                        </option>
-
-                        {skills.map(
-                          (skill) => (
-
-                            <option
-                              key={skill.id}
-                              value={skill.id}
-                            >
-                              {skill.name}
-                            </option>
-
-                          )
-                        )}
-
-                      </select>
-
-
-                      <select
-                        value={
-                          difficultyFilter
-                        }
-                        onChange={(event) =>
-                          setDifficultyFilter(
-                            event.target.value
-                          )
-                        }
-                        className="border border-[var(--border)] bg-[var(--surface-soft)] px-3 py-3 text-sm outline-none"
-                      >
-
-                        <option value="">
-                          All difficulty
-                        </option>
-
-                        <option value="EASY">
-                          Easy
-                        </option>
-
-                        <option value="MEDIUM">
-                          Medium
-                        </option>
-
-                        <option value="HARD">
-                          Hard
-                        </option>
-
-                      </select>
-
-                    </div>
-
-                  </div>
-
-
-                  {/* QUESTION LIST */}
-
-                  <div className="max-h-[650px] overflow-y-auto p-4">
-
-                    {loadingQuestions ? (
-
-                      <div className="flex min-h-[300px] items-center justify-center">
-
-                        <div className="flex items-center gap-3 text-sm text-[var(--muted)]">
-
-                          <Loader2
-                            size={18}
-                            className="animate-spin"
-                          />
-
-                          Loading question bank...
-
-                        </div>
-
-                      </div>
-
-                    ) : filteredQuestions.length === 0 ? (
-
-                      <div className="flex min-h-[300px] flex-col items-center justify-center text-center">
-
-                        <Search
-                          size={32}
-                          className="text-[var(--muted)]"
-                        />
-
-                        <h3 className="mt-4 font-black">
-                          No questions found
-                        </h3>
-
-                        <p className="mt-2 text-sm text-[var(--muted)]">
-                          Try changing your filters.
-                        </p>
-
-                      </div>
-
-                    ) : (
-
-                      <div className="space-y-3">
-
-                        {filteredQuestions.map(
-                          (
-                            question,
-                            index
-                          ) => {
-
-                            const selected =
-                              isSelected(
-                                question.id
-                              );
-
-                            return (
-
-                              <motion.button
-                                type="button"
-                                key={
-                                  question.id
-                                }
-                                onClick={() =>
-                                  toggleQuestion(
-                                    question
-                                  )
-                                }
-                                whileHover={{
-                                  y: -1,
-                                }}
-                                className={`w-full border p-4 text-left transition ${
-                                  selected
-                                    ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-                                    : "border-[var(--border)] bg-[var(--surface-soft)] hover:border-[var(--primary)]/50"
-                                }`}
-                              >
-
-                                <div className="flex gap-4">
-
-                                  <div
-                                    className={`flex h-8 w-8 shrink-0 items-center justify-center ${
-                                      selected
-                                        ? "bg-[var(--primary)] text-white"
-                                        : "bg-[var(--surface)] text-[var(--muted)]"
-                                    }`}
-                                  >
-
-                                    {selected ? (
-                                      <Check
-                                        size={16}
-                                      />
-                                    ) : (
-                                      <span className="text-[10px] font-black">
-                                        {index +
-                                          1}
-                                      </span>
-                                    )}
-
-                                  </div>
-
-
-                                  <div className="min-w-0 flex-1">
-
-                                    <div className="flex flex-wrap items-center gap-2">
-
-                                      {question.topic && (
-
-                                        <span className="text-[9px] font-black uppercase tracking-wider text-[var(--primary)]">
-                                          {
-                                            question.topic
-                                          }
-                                        </span>
-
-                                      )}
-
-                                      <span className="text-[9px] font-black uppercase text-[var(--muted)]">
-                                        {
-                                          question.difficulty
-                                        }
-                                      </span>
-
-                                      <span className="text-[9px] font-black text-[var(--muted)]">
-                                        {
-                                          question.marks
-                                        }{" "}
-                                        mark
-                                      </span>
-
-                                    </div>
-
-
-                                    <p className="mt-2 text-sm font-semibold leading-6">
-                                      {
-                                        question.question_text
-                                      }
-                                    </p>
-
-
-                                    <div className="mt-3 flex items-center gap-2 text-[10px] font-bold text-[var(--muted)]">
-
-                                      <Layers3
-                                        size={12}
-                                      />
-
-                                      {skills.find(
-                                        (skill) =>
-                                          skill.id ===
-                                          question.skill_id
-                                      )?.name ||
-                                        `Skill #${question.skill_id}`}
-
-                                    </div>
-
-                                  </div>
-
-                                </div>
-
-                              </motion.button>
-
-                            );
-
-                          }
-                        )}
-
-                      </div>
-
-                    )}
-
-                  </div>
-
-                </div>
-
-
-                {/* SELECTED QUESTIONS */}
-
-                <div className="h-fit border border-[var(--border)] bg-[var(--surface)]">
-
-                  <div className="border-b border-[var(--border)] p-5">
-
-                    <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--primary)]">
-                      Battle Queue
-                    </p>
-
-                    <h3 className="mt-2 font-black">
-                      Selected questions
-                    </h3>
-
-                  </div>
-
-
-                  <div className="max-h-[550px] overflow-y-auto p-4">
-
-                    {selectedQuestions.length === 0 ? (
-
-                      <div className="py-12 text-center">
-
-                        <Swords
-                          size={28}
-                          className="mx-auto text-[var(--muted)]"
-                        />
-
-                        <p className="mt-4 text-sm font-bold">
-                          No questions selected
-                        </p>
-
-                        <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
-                          Select questions from the
-                          bank to build this battle.
-                        </p>
-
-                      </div>
-
-                    ) : (
-
-                      <div className="space-y-2">
-
-                        {selectedQuestions.map(
-                          (
-                            question,
-                            index
-                          ) => (
-
-                            <div
-                              key={
-                                question.id
-                              }
-                              className="flex gap-3 border border-[var(--border)] bg-[var(--surface-soft)] p-3"
-                            >
-
-                              <div className="flex h-7 w-7 shrink-0 items-center justify-center bg-[var(--primary)] text-[10px] font-black text-white">
-                                {index + 1}
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-
-                                <p className="line-clamp-2 text-xs font-semibold leading-5">
-                                  {
-                                    question.question_text
-                                  }
-                                </p>
-
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  removeSelectedQuestion(
-                                    question.id
-                                  )
-                                }
-                                className="shrink-0 text-[var(--muted)] transition hover:text-red-400"
-                              >
-
-                                <X
-                                  size={15}
-                                />
-
-                              </button>
-
-                            </div>
-
-                          )
-                        )}
-
-                      </div>
-
-                    )}
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            </motion.div>
-
-          )}
-
-
-          {/* ================================================= */}
-          {/* STEP 3 — REVIEW */}
-          {/* ================================================= */}
-
-          {step === 3 && (
-
-            <motion.div
-              initial={{
-                opacity: 0,
-                x: 15,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-            >
-
-              <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-
-                {/* SUMMARY */}
-
-                <div className="border border-[var(--border)] bg-[var(--surface)] p-7">
-
-                  <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[var(--primary)]">
-                    Final review
-                  </p>
-
-                  <h2 className="mt-2 text-2xl font-black">
-                    {form.title}
-                  </h2>
-
-                  <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-                    {form.description ||
-                      "No description provided."}
-                  </p>
-
-
-                  <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
-
-                    <div className="bg-[var(--surface-soft)] p-4">
-
-                      <Clock3
-                        size={16}
-                        className="text-[var(--primary)]"
-                      />
-
-                      <p className="mt-3 text-lg font-black">
-                        {
-                          form.duration_minutes
-                        }m
-                      </p>
-
-                      <p className="text-[10px] text-[var(--muted)]">
-                        Duration
-                      </p>
-
-                    </div>
-
-
-                    <div className="bg-[var(--surface-soft)] p-4">
-
-                      <Trophy
-                        size={16}
-                        className="text-[var(--primary)]"
-                      />
-
-                      <p className="mt-3 text-lg font-black">
-                        {
-                          form.passing_percentage
-                        }%
-                      </p>
-
-                      <p className="text-[10px] text-[var(--muted)]">
-                        Passing
-                      </p>
-
-                    </div>
-
-
-                    <div className="bg-[var(--surface-soft)] p-4">
-
-                      <Layers3
-                        size={16}
-                        className="text-[var(--primary)]"
-                      />
-
-                      <p className="mt-3 text-lg font-black">
-                        {
-                          selectedQuestions.length
-                        }
-                      </p>
-
-                      <p className="text-[10px] text-[var(--muted)]">
-                        Questions
-                      </p>
-
-                    </div>
-
-
-                    <div className="bg-[var(--surface-soft)] p-4">
-
-                      <Swords
-                        size={16}
-                        className="text-[var(--primary)]"
-                      />
-
-                      <p className="mt-3 text-lg font-black">
-                        {
-                          form.difficulty
-                        }
-                      </p>
-
-                      <p className="text-[10px] text-[var(--muted)]">
-                        Difficulty
-                      </p>
-
-                    </div>
-
-                  </div>
-
-
-                  <div className="mt-8">
-
-                    <h3 className="text-sm font-black uppercase tracking-wider">
-                      Questions
-                    </h3>
-
-                    <div className="mt-4 space-y-2">
-
-                      {selectedQuestions.map(
-                        (
-                          question,
-                          index
-                        ) => (
-
-                          <div
-                            key={
-                              question.id
-                            }
-                            className="flex items-center gap-4 border border-[var(--border)] bg-[var(--surface-soft)] p-4"
-                          >
-
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center bg-[var(--primary)] text-xs font-black text-white">
-                              {index + 1}
-                            </div>
-
-                            <p className="text-sm font-semibold">
-                              {
-                                question.question_text
-                              }
-                            </p>
-
-                          </div>
-
-                        )
-                      )}
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-
-                {/* CREATE CARD */}
-
-                <div className="h-fit border border-[var(--primary)]/30 bg-[var(--primary-soft)] p-7">
-
-                  <div className="flex h-12 w-12 items-center justify-center bg-[var(--primary)] text-white">
-
-                    <Swords
-                      size={21}
-                    />
-
-                  </div>
-
-                  <h3 className="mt-5 text-xl font-black">
-                    Ready for battle?
-                  </h3>
-
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                    Your battle will be created as a
-                    draft. You can review and publish
-                    it from the assessment manager.
-                  </p>
-
-
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={
-                      handleCreateBattle
-                    }
-                    className="mt-7 flex w-full items-center justify-center gap-2 bg-[var(--primary)] px-5 py-4 text-xs font-black uppercase tracking-wider text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-
-                    {saving ? (
-
-                      <>
-                        <Loader2
-                          size={16}
-                          className="animate-spin"
-                        />
-
-                        Creating Battle...
-
-                      </>
-
-                    ) : (
-
-                      <>
-                        Create Battle
-
-                        <ArrowRight
-                          size={16}
-                        />
-
-                      </>
-
-                    )}
-
-                  </button>
-
-                </div>
-
-              </div>
-
-            </motion.div>
-
-          )}
-
-        </div>
-
-
-        {/* ================================================== */}
-        {/* NAVIGATION */}
-        {/* ================================================== */}
-
-        <div className="mt-8 flex items-center justify-between border-t border-[var(--border)] pt-6">
-
-          <button
-            type="button"
-            onClick={previousStep}
-            disabled={step === 1 || saving}
-            className="flex items-center gap-2 border border-[var(--border)] px-5 py-3 text-xs font-black uppercase tracking-wider transition hover:border-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-30"
+            </div>
+
+          </motion.section>
+
+
+          {/* AUTOMATIC CONFIGURATION */}
+
+          <motion.section
+            initial={{
+              opacity: 0,
+              y: 12,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            transition={{
+              delay: 0.05,
+            }}
+            className="border border-[var(--primary)]/30 bg-[var(--surface)] p-6 lg:p-8"
           >
 
-            <ArrowLeft size={15} />
+            <div className="flex items-center gap-3">
 
-            Back
+              <div className="flex h-11 w-11 items-center justify-center bg-[var(--primary)] text-white">
 
-          </button>
+                <Target size={19} />
+
+              </div>
+
+              <div>
+
+                <h2 className="font-black">
+                  Automatic Question Selection
+                </h2>
+
+                <p className="text-xs text-[var(--muted)]">
+                  These settings determine which questions
+                  will enter the battle.
+                </p>
+
+              </div>
+
+            </div>
 
 
-          {step < 3 && (
+            <div className="mt-7 grid gap-5 md:grid-cols-2">
+
+
+              {/* SKILL */}
+
+              <div>
+
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                  Skill
+                </label>
+
+                <select
+                  value={form.skill_id}
+                  disabled={loadingSkills}
+                  onChange={(event) => {
+
+                    updateField(
+                      "skill_id",
+                      event.target.value
+                    );
+
+                    updateField(
+                      "topic",
+                      ""
+                    );
+
+                  }}
+                  className="mt-2 w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm outline-none disabled:opacity-60"
+                >
+
+                  <option value="">
+                    Select Skill
+                  </option>
+
+                  {skills.map(
+                    (skill) => (
+
+                      <option
+                        key={skill.id}
+                        value={skill.id}
+                      >
+                        {skill.name}
+                      </option>
+
+                    )
+                  )}
+
+                </select>
+
+              </div>
+
+
+              {/* TOPIC */}
+
+              <div>
+
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                  Topic
+                </label>
+
+                <select
+                  value={form.topic}
+                  disabled={
+                    !form.skill_id ||
+                    loadingTopics
+                  }
+                  onChange={(event) =>
+                    updateField(
+                      "topic",
+                      event.target.value
+                    )
+                  }
+                  className="mt-2 w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm outline-none disabled:opacity-60"
+                >
+
+                  <option value="">
+                    All Topics
+                  </option>
+
+                  {topics.map(
+                    (topic) => (
+
+                      <option
+                        key={topic}
+                        value={topic}
+                      >
+                        {topic}
+                      </option>
+
+                    )
+                  )}
+
+                </select>
+
+              </div>
+
+
+              {/* DIFFICULTY */}
+
+              <div>
+
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                  Difficulty
+                </label>
+
+                <select
+                  value={
+                    form.difficulty
+                  }
+                  onChange={(event) =>
+                    updateField(
+                      "difficulty",
+                      event.target.value
+                    )
+                  }
+                  className="mt-2 w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm outline-none"
+                >
+
+                  <option value="BEGINNER">
+                    Beginner
+                  </option>
+
+                  <option value="EASY">
+                    Easy
+                  </option>
+
+                  <option value="MEDIUM">
+                    Medium
+                  </option>
+
+                  <option value="HARD">
+                    Hard
+                  </option>
+
+                  <option value="MIXED">
+                    Mixed
+                  </option>
+
+                </select>
+
+              </div>
+
+
+              {/* QUESTION COUNT */}
+
+              <div>
+
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                  Question Count
+                </label>
+
+                <div className="relative">
+
+                  <Layers3
+                    size={15}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)]"
+                  />
+
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={
+                      form.question_count
+                    }
+                    onChange={(event) =>
+                      updateField(
+                        "question_count",
+                        event.target.value
+                      )
+                    }
+                    className="mt-2 w-full border border-[var(--border)] bg-[var(--surface-soft)] py-3 pl-10 pr-4 text-sm outline-none"
+                  />
+
+                </div>
+
+              </div>
+
+            </div>
+
+
+            {/* AVAILABILITY */}
+
+            <div className="mt-6">
+
+              {checkingQuestions ? (
+
+                <div className="flex items-center gap-2 border border-[var(--border)] bg-[var(--surface-soft)] p-4 text-xs text-[var(--muted)]">
+
+                  <Loader2
+                    size={15}
+                    className="animate-spin"
+                  />
+
+                  Checking question bank...
+
+                </div>
+
+              ) : availableQuestions !== null ? (
+
+                <div
+                  className={`flex items-center justify-between border p-4 ${
+                    availableQuestions >=
+                    Number(form.question_count)
+                      ? "border-[var(--success)]/30 bg-[var(--success)]/10"
+                      : "border-[var(--danger)]/30 bg-[var(--danger)]/10"
+                  }`}
+                >
+
+                  <div className="flex items-center gap-3">
+
+                    <CheckCircle2
+                      size={18}
+                    />
+
+                    <div>
+
+                      <p className="text-xs font-black">
+                        {availableQuestions} matching questions available
+                      </p>
+
+                      <p className="mt-1 text-[10px] text-[var(--muted)]">
+                        Required:{" "}
+                        {form.question_count}
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                  <div className="text-right">
+
+                    <p className="text-lg font-black">
+                      {availableQuestions}
+                    </p>
+
+                    <p className="text-[9px] uppercase text-[var(--muted)]">
+                      Available
+                    </p>
+
+                  </div>
+
+                </div>
+
+              ) : (
+
+                <div className="border border-[var(--border)] bg-[var(--surface-soft)] p-4 text-xs text-[var(--muted)]">
+
+                  Select a skill to check question
+                  availability.
+
+                </div>
+
+              )}
+
+            </div>
+
+          </motion.section>
+
+
+          {/* BATTLE RULES */}
+
+          <motion.section
+            initial={{
+              opacity: 0,
+              y: 12,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            transition={{
+              delay: 0.1,
+            }}
+            className="border border-[var(--border)] bg-[var(--surface)] p-6 lg:p-8"
+          >
+
+            <div className="flex items-center gap-3">
+
+              <div className="flex h-11 w-11 items-center justify-center bg-[var(--primary-soft)] text-[var(--primary)]">
+
+                <Trophy size={19} />
+
+              </div>
+
+              <div>
+
+                <h2 className="font-black">
+                  Battle Rules
+                </h2>
+
+                <p className="text-xs text-[var(--muted)]">
+                  Configure how the student will play.
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <div className="mt-7 grid gap-5 md:grid-cols-2">
+
+
+              {/* DURATION */}
+
+              <div>
+
+                <label className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+
+                  <Clock3 size={13} />
+
+                  Duration
+
+                </label>
+
+                <input
+                  type="number"
+                  min="1"
+                  max="300"
+                  value={
+                    form.duration_minutes
+                  }
+                  onChange={(event) =>
+                    updateField(
+                      "duration_minutes",
+                      event.target.value
+                    )
+                  }
+                  className="mt-2 w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm outline-none"
+                />
+
+              </div>
+
+
+              {/* PASSING */}
+
+              <div>
+
+                <label className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+
+                  <Trophy size={13} />
+
+                  Passing Percentage
+
+                </label>
+
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={
+                    form.passing_percentage
+                  }
+                  onChange={(event) =>
+                    updateField(
+                      "passing_percentage",
+                      event.target.value
+                    )
+                  }
+                  className="mt-2 w-full border border-[var(--border)] bg-[var(--surface-soft)] px-4 py-3 text-sm outline-none"
+                />
+
+              </div>
+
+            </div>
+
+          </motion.section>
+
+
+          {/* SUMMARY */}
+
+          <div className="border border-[var(--primary)]/20 bg-[var(--primary-soft)] p-5">
+
+            <div className="flex items-start gap-3">
+
+              <Swords
+                size={18}
+                className="mt-0.5 text-[var(--primary)]"
+              />
+
+              <div>
+
+                <p className="text-xs font-black">
+                  How this battle will work
+                </p>
+
+                <p className="mt-2 text-xs leading-6 text-[var(--muted)]">
+
+                  When you publish this battle,
+                  SkillArena will randomly select{" "}
+
+                  <strong>
+                    {form.question_count}
+                  </strong>{" "}
+
+                  active questions matching{" "}
+
+                  <strong>
+                    {form.topic || "all topics"}
+                  </strong>{" "}
+
+                  from the selected skill at the chosen
+                  difficulty.
+
+                </p>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          {/* ACTIONS */}
+
+          <div className="flex justify-end">
 
             <button
-              type="button"
-              onClick={nextStep}
-              className="flex items-center gap-2 bg-[var(--primary)] px-6 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:brightness-110"
+              type="submit"
+              disabled={
+                saving ||
+                !form.skill_id ||
+                (
+                  availableQuestions !== null &&
+                  Number(form.question_count)
+                  > availableQuestions
+                )
+              }
+              className="flex items-center gap-2 bg-[var(--primary)] px-7 py-3.5 text-xs font-black uppercase tracking-wider text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
             >
 
-              Continue
+              {saving ? (
 
-              <ArrowRight size={15} />
+                <>
+                  <Loader2
+                    size={16}
+                    className="animate-spin"
+                  />
+
+                  Creating...
+
+                </>
+
+              ) : (
+
+                <>
+                  Create Battle
+
+                  <ArrowRight
+                    size={16}
+                  />
+
+                </>
+
+              )}
 
             </button>
 
-          )}
+          </div>
 
-        </div>
+        </form>
 
       </main>
 
     </div>
-
   );
 }
