@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.dependencies import require_admin
 from app.db.session import get_db
 
-from app.models.category import Category
 from app.models.option import Option
 from app.models.question import Question
 from app.models.skill import Skill
@@ -31,13 +30,6 @@ router = APIRouter(
     prefix="/questions",
     tags=["Questions"],
 )
-
-
-# ============================================================
-# DEFAULT CATEGORY
-# ============================================================
-
-DEFAULT_CATEGORY_NAME = "Technical Skills"
 
 
 # ============================================================
@@ -74,7 +66,8 @@ def get_questions(
 
     if difficulty:
         query = query.where(
-            Question.difficulty == difficulty.upper()
+            Question.difficulty
+            == difficulty.upper()
         )
 
     return db.scalars(query).all()
@@ -96,7 +89,9 @@ def get_question(
     question = db.scalar(
         select(Question)
         .options(
-            selectinload(Question.options)
+            selectinload(
+                Question.options
+            )
         )
         .where(
             Question.id == question_id
@@ -193,6 +188,18 @@ def create_question(
 
 # ============================================================
 # CSV IMPORT
+#
+# OPTIMIZED VERSION
+#
+# - Loads skills once
+# - Loads existing questions once
+# - Loads options once
+# - Uses in-memory dictionaries
+# - Updates existing questions
+# - Does not recreate options unnecessarily
+# - Preserves topic
+# - Prevents duplicate questions
+# - Uses one final commit
 # ============================================================
 
 @router.post(
@@ -205,79 +212,81 @@ def import_questions_csv(
     _: object = Depends(require_admin),
 ):
     # ========================================================
-    # FILE VALIDATION
+    # VALIDATE FILE
     # ========================================================
 
     if not file.filename:
         raise HTTPException(
             status_code=400,
-            detail="No file selected",
+            detail="CSV file is required.",
         )
 
-    if not file.filename.lower().endswith(".csv"):
+    if not file.filename.lower().endswith(
+        ".csv"
+    ):
         raise HTTPException(
             status_code=400,
-            detail="Only CSV files are allowed",
+            detail="Only CSV files are allowed.",
         )
 
     # ========================================================
-    # READ FILE
+    # READ CSV
     # ========================================================
 
     try:
+        content = file.file.read()
 
-        content = file.file.read().decode(
-            "utf-8-sig"
+        if not content:
+            raise HTTPException(
+                status_code=400,
+                detail="CSV file is empty.",
+            )
+
+        try:
+            text = content.decode(
+                "utf-8-sig"
+            )
+        except UnicodeDecodeError:
+            text = content.decode(
+                "utf-8"
+            )
+
+        reader = csv.DictReader(
+            io.StringIO(text)
         )
 
-    except UnicodeDecodeError:
+        rows = list(reader)
 
+    except HTTPException:
+        raise
+
+    except Exception as exc:
         raise HTTPException(
             status_code=400,
-            detail="CSV must be UTF-8 encoded",
+            detail=(
+                "Unable to read CSV file: "
+                + str(exc)
+            ),
         )
 
-    if not content.strip():
-
+    if not rows:
         raise HTTPException(
             status_code=400,
-            detail="CSV file is empty",
-        )
-
-    # ========================================================
-    # CSV READER
-    # ========================================================
-
-    reader = csv.DictReader(
-        io.StringIO(content)
-    )
-
-    if not reader.fieldnames:
-
-        raise HTTPException(
-            status_code=400,
-            detail="CSV header is missing",
+            detail="CSV file contains no data rows.",
         )
 
     # ========================================================
     # NORMALIZE HEADERS
     # ========================================================
 
-    normalized_headers = {}
+    original_headers = (
+        reader.fieldnames or []
+    )
 
-    for header in reader.fieldnames:
-
-        normalized = (
-            header or ""
-        ).strip().lower()
-
-        normalized_headers[
-            normalized
-        ] = header
-
-    # ========================================================
-    # REQUIRED COLUMNS
-    # ========================================================
+    normalized_headers = {
+        (header or "").strip().lower()
+        for header in original_headers
+    }
 
     required_headers = {
         "topic",
@@ -294,128 +303,137 @@ def import_questions_csv(
 
     missing_headers = (
         required_headers
-        - set(normalized_headers.keys())
+        - normalized_headers
     )
 
     if missing_headers:
-
         raise HTTPException(
             status_code=400,
-            detail={
-                "message": (
-                    "Missing required CSV columns"
-                ),
-                "missing_columns": sorted(
-                    missing_headers
-                ),
-                "received_columns": [
-                    header
-                    for header in reader.fieldnames
-                ],
-            },
+            detail=(
+                "Missing CSV columns: "
+                + ", ".join(
+                    sorted(missing_headers)
+                )
+            ),
         )
 
     # ========================================================
     # FIND SKILL COLUMN
     #
-    # Your generated CSV has a blank first header:
+    # Preferred:
     #
-    # [blank] | topic | question_text | ...
-    #
-    # Example:
-    #
-    # HTML    | Web Components | ...
-    # Python  | Dataclasses    | ...
-    #
-    # We support:
-    #
-    # blank
     # skill
+    #
+    # Also supports:
+    #
     # category
+    #
+    # Backward compatible with an unnamed
+    # first column from older CSV files.
     # ========================================================
 
-    skill_header = None
+    skill_column = None
 
-    for header in reader.fieldnames:
+    for column in original_headers:
 
         normalized = (
-            header or ""
+            column or ""
         ).strip().lower()
 
         if normalized in {
-            "",
             "skill",
             "category",
         }:
-
-            skill_header = header
-
+            skill_column = column
             break
 
-    if skill_header is None:
+    # --------------------------------------------------------
+    # BACKWARD COMPATIBILITY
+    # --------------------------------------------------------
 
+    if skill_column is None:
+
+        for column in original_headers:
+
+            if (
+                column is not None
+                and column.strip() == ""
+            ):
+                skill_column = column
+                break
+
+    if skill_column is None:
         raise HTTPException(
             status_code=400,
             detail=(
-                "Could not find the "
-                "skill/category column."
+                "CSV must contain a "
+                "'skill' or 'category' column."
             ),
         )
 
     # ========================================================
-    # READ ROWS
+    # LOAD ALL SKILLS ONCE
     # ========================================================
 
-    rows = list(reader)
+    skills = db.scalars(
+        select(Skill)
+    ).all()
 
-    if not rows:
-
-        raise HTTPException(
-            status_code=400,
-            detail="CSV contains no questions",
-        )
-
-    # ========================================================
-    # COUNTERS
-    # ========================================================
-
-    created = 0
-    updated = 0
-    skills_created = 0
-    categories_created = 0
-
-    failed = []
+    skill_map = {
+        skill.name.strip().lower(): skill
+        for skill in skills
+    }
 
     # ========================================================
-    # FIND / CREATE DEFAULT CATEGORY
+    # LOAD ALL EXISTING QUESTIONS ONCE
+    #
+    # Options are loaded together.
+    # This avoids a database query for every row.
     # ========================================================
 
-    default_category = db.scalar(
-        select(Category).where(
-            Category.name.ilike(
-                DEFAULT_CATEGORY_NAME
+    existing_questions = db.scalars(
+        select(Question)
+        .options(
+            selectinload(
+                Question.options
             )
         )
-    )
-
-    if not default_category:
-
-        default_category = Category(
-            name=DEFAULT_CATEGORY_NAME,
-            description=(
-                "Technical programming "
-                "and development skills."
-            ),
-        )
-
-        db.add(default_category)
-
-        db.flush()
-
-        categories_created += 1
+    ).all()
 
     # ========================================================
-    # PROCESS EVERY CSV ROW
+    # CREATE IN-MEMORY QUESTION MAP
+    #
+    # Key:
+    #
+    #     skill_id + normalized question text
+    #
+    # This lets us detect existing questions
+    # without querying PostgreSQL for every row.
+    # ========================================================
+
+    question_map = {
+        (
+            question.skill_id,
+            question.question_text
+            .strip()
+            .lower(),
+        ): question
+        for question in existing_questions
+    }
+
+    # ========================================================
+    # STATISTICS
+    # ========================================================
+
+    created_count = 0
+    updated_count = 0
+    skipped_count = 0
+    failed_count = 0
+
+    errors = []
+
+    # ========================================================
+    # PROCESS CSV
     # ========================================================
 
     for row_number, row in enumerate(
@@ -425,386 +443,427 @@ def import_questions_csv(
 
         try:
 
-            # ====================================================
-            # SAVEPOINT
-            #
-            # If one row fails, only that row is rolled back.
-            # ====================================================
+            # =================================================
+            # READ VALUES
+            # =================================================
 
-            with db.begin_nested():
+            skill_name = (
+                row.get(skill_column)
+                or ""
+            ).strip()
 
-                # ================================================
-                # READ VALUES
-                # ================================================
+            topic = (
+                row.get("topic")
+                or ""
+            ).strip()
 
-                skill_name = (
-                    row.get(skill_header)
-                    or ""
-                ).strip()
+            question_text = (
+                row.get("question_text")
+                or ""
+            ).strip()
 
-                topic = (
-                    row.get("topic")
-                    or ""
-                ).strip()
+            difficulty = (
+                row.get("difficulty")
+                or ""
+            ).strip().upper()
 
-                question_text = (
-                    row.get("question_text")
-                    or ""
-                ).strip()
+            marks_raw = (
+                row.get("marks")
+                or ""
+            ).strip()
 
-                difficulty = (
-                    row.get("difficulty")
-                    or "EASY"
-                ).strip().upper()
+            option_a = (
+                row.get("option_a")
+                or ""
+            ).strip()
 
-                explanation = (
-                    row.get("explanation")
-                    or ""
-                ).strip()
+            option_b = (
+                row.get("option_b")
+                or ""
+            ).strip()
 
-                correct_option = (
-                    row.get("correct_option")
-                    or ""
-                ).strip().upper()
+            option_c = (
+                row.get("option_c")
+                or ""
+            ).strip()
 
-                # ================================================
-                # VALIDATE SKILL
-                # ================================================
+            option_d = (
+                row.get("option_d")
+                or ""
+            ).strip()
 
-                if not skill_name:
+            correct_option = (
+                row.get("correct_option")
+                or ""
+            ).strip().upper()
 
-                    raise ValueError(
-                        "Skill is missing"
-                    )
+            explanation = (
+                row.get("explanation")
+                or ""
+            ).strip()
 
-                # ================================================
-                # VALIDATE QUESTION
-                # ================================================
+            # =================================================
+            # VALIDATION
+            # =================================================
 
-                if not question_text:
-
-                    raise ValueError(
-                        "Question text is missing"
-                    )
-
-                # ================================================
-                # VALIDATE DIFFICULTY
-                # ================================================
-
-                if difficulty not in {
-                    "EASY",
-                    "MEDIUM",
-                    "HARD",
-                }:
-
-                    raise ValueError(
-                        f"Invalid difficulty "
-                        f"'{difficulty}'. "
-                        "Expected EASY, MEDIUM or HARD."
-                    )
-
-                # ================================================
-                # VALIDATE CORRECT OPTION
-                # ================================================
-
-                if correct_option not in {
-                    "A",
-                    "B",
-                    "C",
-                    "D",
-                }:
-
-                    raise ValueError(
-                        "correct_option must be "
-                        "A, B, C or D"
-                    )
-
-                # ================================================
-                # MARKS
-                # ================================================
-
-                marks_raw = (
-                    row.get("marks")
-                    or "1"
-                ).strip()
-
-                try:
-
-                    marks = int(
-                        marks_raw
-                    )
-
-                except ValueError:
-
-                    raise ValueError(
-                        "Marks must be an integer"
-                    )
-
-                if marks < 1:
-
-                    raise ValueError(
-                        "Marks must be at least 1"
-                    )
-
-                # ================================================
-                # OPTIONS
-                # ================================================
-
-                options = {
-
-                    "A": (
-                        row.get("option_a")
-                        or ""
-                    ).strip(),
-
-                    "B": (
-                        row.get("option_b")
-                        or ""
-                    ).strip(),
-
-                    "C": (
-                        row.get("option_c")
-                        or ""
-                    ).strip(),
-
-                    "D": (
-                        row.get("option_d")
-                        or ""
-                    ).strip(),
-                }
-
-                # ================================================
-                # VALIDATE OPTIONS
-                # ================================================
-
-                for letter, text in options.items():
-
-                    if not text:
-
-                        raise ValueError(
-                            f"Option {letter} "
-                            "is empty"
-                        )
-
-                # ================================================
-                # FIND SKILL
-                # ================================================
-
-                skill = db.scalar(
-                    select(Skill).where(
-                        Skill.name.ilike(
-                            skill_name
-                        )
-                    )
+            if not skill_name:
+                raise ValueError(
+                    "Skill is required."
                 )
 
-                # ================================================
-                # CREATE SKILL IF MISSING
-                # ================================================
-
-                if not skill:
-
-                    skill = Skill(
-                        category_id=(
-                            default_category.id
-                        ),
-                        name=skill_name,
-                        description=(
-                            f"{skill_name} "
-                            "technical skill"
-                        ),
-                    )
-
-                    db.add(skill)
-
-                    db.flush()
-
-                    skills_created += 1
-
-                # ================================================
-                # FIND EXISTING QUESTION
-                #
-                # Match:
-                #
-                # skill + question_text
-                #
-                # This prevents duplicates.
-                # ================================================
-
-                existing_question = db.scalar(
-                    select(Question)
-                    .options(
-                        selectinload(
-                            Question.options
-                        )
-                    )
-                    .where(
-                        Question.skill_id
-                        == skill.id,
-                        Question.question_text
-                        == question_text,
-                    )
+            if not topic:
+                raise ValueError(
+                    "Topic cannot be blank."
                 )
 
-                # ================================================
-                # UPDATE EXISTING QUESTION
-                # ================================================
+            if not question_text:
+                raise ValueError(
+                    "Question text is required."
+                )
 
-                if existing_question:
+            if difficulty not in {
+                "EASY",
+                "MEDIUM",
+                "HARD",
+            }:
+                raise ValueError(
+                    "Difficulty must be EASY, "
+                    "MEDIUM or HARD."
+                )
 
+            try:
+                marks = int(marks_raw)
+
+            except ValueError:
+                raise ValueError(
+                    "Marks must be an integer."
+                )
+
+            if marks <= 0:
+                raise ValueError(
+                    "Marks must be greater than 0."
+                )
+
+            if correct_option not in {
+                "A",
+                "B",
+                "C",
+                "D",
+            }:
+                raise ValueError(
+                    "Correct option must be A, B, C or D."
+                )
+
+            options = {
+                "A": option_a,
+                "B": option_b,
+                "C": option_c,
+                "D": option_d,
+            }
+
+            if any(
+                not value
+                for value in options.values()
+            ):
+                raise ValueError(
+                    "All four options are required."
+                )
+
+            # =================================================
+            # FIND SKILL FROM MEMORY
+            # =================================================
+
+            skill = skill_map.get(
+                skill_name.lower()
+            )
+
+            if not skill:
+                raise ValueError(
+                    f"Skill '{skill_name}' not found."
+                )
+
+            # =================================================
+            # QUESTION KEY
+            # =================================================
+
+            question_key = (
+                skill.id,
+                question_text.lower(),
+            )
+
+            existing_question = (
+                question_map.get(
+                    question_key
+                )
+            )
+
+            # =================================================
+            # UPDATE EXISTING QUESTION
+            # =================================================
+
+            if existing_question:
+
+                question_changed = False
+
+                # ---------------------------------------------
+                # TOPIC
+                # ---------------------------------------------
+
+                if (
+                    existing_question.topic
+                    != topic
+                ):
                     existing_question.topic = (
-                        topic or None
+                        topic
                     )
 
+                    question_changed = True
+
+                # ---------------------------------------------
+                # DIFFICULTY
+                # ---------------------------------------------
+
+                if (
+                    existing_question.difficulty
+                    != difficulty
+                ):
                     existing_question.difficulty = (
                         difficulty
                     )
 
+                    question_changed = True
+
+                # ---------------------------------------------
+                # MARKS
+                # ---------------------------------------------
+
+                if (
+                    existing_question.marks
+                    != marks
+                ):
                     existing_question.marks = (
                         marks
                     )
 
+                    question_changed = True
+
+                # ---------------------------------------------
+                # EXPLANATION
+                # ---------------------------------------------
+
+                new_explanation = (
+                    explanation or None
+                )
+
+                if (
+                    existing_question.explanation
+                    != new_explanation
+                ):
                     existing_question.explanation = (
-                        explanation or None
+                        new_explanation
                     )
 
-                    # --------------------------------------------
-                    # REMOVE OLD OPTIONS
-                    # --------------------------------------------
+                    question_changed = True
 
-                    existing_question.options.clear()
+                # =============================================
+                # OPTIONS
+                # =============================================
 
-                    # --------------------------------------------
-                    # ADD NEW OPTIONS
-                    # --------------------------------------------
+                existing_options = list(
+                    existing_question.options
+                )
 
-                    for letter, text in options.items():
+                existing_option_texts = [
+                    option.option_text.strip()
+                    for option in existing_options
+                ]
 
-                        existing_question.options.append(
+                incoming_option_texts = [
+                    option_a,
+                    option_b,
+                    option_c,
+                    option_d,
+                ]
+
+                options_changed = (
+                    existing_option_texts
+                    != incoming_option_texts
+                )
+
+                # ---------------------------------------------
+                # REBUILD OPTIONS ONLY IF TEXT CHANGED
+                # ---------------------------------------------
+
+                if options_changed:
+
+                    for option in existing_options:
+                        db.delete(option)
+
+                    for key, option_text in (
+                        options.items()
+                    ):
+
+                        db.add(
                             Option(
-                                option_text=text,
+                                question_id=(
+                                    existing_question.id
+                                ),
+                                option_text=(
+                                    option_text
+                                ),
                                 is_correct=(
-                                    letter
+                                    key
                                     == correct_option
                                 ),
                             )
                         )
 
-                    updated += 1
-
-                # ================================================
-                # CREATE NEW QUESTION
-                # ================================================
+                    question_changed = True
 
                 else:
 
-                    question = Question(
-                        skill_id=skill.id,
-                        topic=topic or None,
-                        question_text=question_text,
-                        difficulty=difficulty,
-                        marks=marks,
-                        explanation=(
-                            explanation
-                            or None
-                        ),
-                    )
+                    # -----------------------------------------
+                    # OPTIONS SAME
+                    #
+                    # Only correct answer may have changed.
+                    # -----------------------------------------
 
-                    # --------------------------------------------
-                    # ADD OPTIONS
-                    # --------------------------------------------
+                    for index, option in enumerate(
+                        existing_options
+                    ):
 
-                    for letter, text in options.items():
-
-                        question.options.append(
-                            Option(
-                                option_text=text,
-                                is_correct=(
-                                    letter
-                                    == correct_option
-                                ),
+                        option_key = (
+                            chr(
+                                ord("A")
+                                + index
                             )
                         )
 
-                    db.add(question)
+                        should_be_correct = (
+                            option_key
+                            == correct_option
+                        )
 
-                    created += 1
+                        if (
+                            option.is_correct
+                            != should_be_correct
+                        ):
+                            option.is_correct = (
+                                should_be_correct
+                            )
 
-        # ========================================================
-        # ROW FAILED
-        # ========================================================
+                            question_changed = True
 
-        except Exception as error:
+                # ---------------------------------------------
+                # COUNT
+                # ---------------------------------------------
 
-            failed.append(
+                if question_changed:
+                    updated_count += 1
+                else:
+                    skipped_count += 1
+
+                continue
+
+            # =================================================
+            # CREATE NEW QUESTION
+            # =================================================
+
+            question = Question(
+                skill_id=skill.id,
+                topic=topic,
+                question_text=question_text,
+                difficulty=difficulty,
+                marks=marks,
+                explanation=(
+                    explanation
+                    or None
+                ),
+                is_active=True,
+            )
+
+            # -------------------------------------------------
+            # ADD OPTIONS THROUGH RELATIONSHIP
+            # -------------------------------------------------
+
+            for key, option_text in (
+                options.items()
+            ):
+
+                question.options.append(
+                    Option(
+                        option_text=option_text,
+                        is_correct=(
+                            key
+                            == correct_option
+                        ),
+                    )
+                )
+
+            db.add(question)
+
+            # -------------------------------------------------
+            # ADD TO MAP
+            #
+            # This prevents duplicate rows inside
+            # the SAME CSV.
+            # -------------------------------------------------
+
+            question_map[
+                question_key
+            ] = question
+
+            created_count += 1
+
+        # ====================================================
+        # ROW ERROR
+        # ====================================================
+
+        except Exception as exc:
+
+            failed_count += 1
+
+            errors.append(
                 {
                     "row": row_number,
-                    "error": str(error),
+                    "error": str(exc),
                 }
             )
 
-            # begin_nested() has already rolled
-            # back this row's savepoint.
-
-            continue
-
     # ========================================================
-    # IF ANY ROW FAILED
-    #
-    # DO NOT PARTIALLY IMPORT THE CSV.
-    # ========================================================
-
-    if failed:
-
-        db.rollback()
-
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "message": (
-                    "CSV import failed. "
-                    "No changes were committed."
-                ),
-                "failed_rows": failed,
-                "total_rows": len(rows),
-                "failed_count": len(failed),
-            },
-        )
-
-    # ========================================================
-    # COMMIT EVERYTHING
+    # COMMIT EVERYTHING ONCE
     # ========================================================
 
     try:
 
         db.commit()
 
-    except Exception as error:
+    except Exception as exc:
 
         db.rollback()
 
         raise HTTPException(
             status_code=500,
             detail=(
-                "Failed to commit CSV import: "
-                f"{str(error)}"
+                "Failed to import questions: "
+                + str(exc)
             ),
         )
 
     # ========================================================
-    # SUCCESS
+    # RESPONSE
     # ========================================================
 
     return {
         "message": (
-            "Question bank imported successfully"
+            "Question bank imported successfully."
         ),
         "rows_processed": len(rows),
-        "created": created,
-        "updated": updated,
-        "skills_created": skills_created,
-        "categories_created": categories_created,
-        "failed": 0,
+        "created": created_count,
+        "updated": updated_count,
+        "skipped": skipped_count,
+        "failed": failed_count,
+        "errors": errors,
     }
 
 
