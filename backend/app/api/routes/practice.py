@@ -1,5 +1,7 @@
+import random
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.dependencies import require_student
@@ -23,12 +25,11 @@ router = APIRouter(
 
 
 # ============================================================
-# GET AVAILABLE TOPICS
+# GET PRACTICE TOPICS
 # ============================================================
 
 @router.get(
     "/topics",
-    response_model=list[str],
 )
 def get_practice_topics(
     skill_id: int,
@@ -43,7 +44,9 @@ def get_practice_topics(
             Question.skill_id == skill_id,
             Question.is_active.is_(True),
             Question.topic.is_not(None),
-            func.trim(Question.topic) != "",
+            func.trim(
+                Question.topic
+            ) != "",
         )
         .distinct()
         .order_by(
@@ -71,31 +74,10 @@ def get_practice_questions(
     _: User = Depends(require_student),
 ):
 
-    # --------------------------------------------------------
-    # LIMIT
-    # --------------------------------------------------------
-
     limit = max(
         1,
         min(limit, 20),
     )
-
-    # --------------------------------------------------------
-    # BASE QUERY
-    #
-    # IMPORTANT:
-    # We let PostgreSQL perform the random selection.
-    #
-    # OLD:
-    # Fetch ALL questions
-    # → Python shuffle
-    # → take 10
-    #
-    # NEW:
-    # Database
-    # → random
-    # → LIMIT 10
-    # --------------------------------------------------------
 
     query = (
         select(Question)
@@ -109,18 +91,10 @@ def get_practice_questions(
         )
     )
 
-    # --------------------------------------------------------
-    # SKILL
-    # --------------------------------------------------------
-
     if skill_id is not None:
         query = query.where(
             Question.skill_id == skill_id
         )
-
-    # --------------------------------------------------------
-    # TOPIC
-    # --------------------------------------------------------
 
     if topic:
         query = query.where(
@@ -130,35 +104,19 @@ def get_practice_questions(
             == topic.strip().lower()
         )
 
-    # --------------------------------------------------------
-    # DIFFICULTY
-    # --------------------------------------------------------
-
     if difficulty:
         query = query.where(
             Question.difficulty
             == difficulty.upper()
         )
 
-    # --------------------------------------------------------
-    # RANDOM + LIMIT
-    # --------------------------------------------------------
-
-    query = (
+    questions = db.scalars(
         query
         .order_by(
             func.random()
         )
         .limit(limit)
-    )
-
-    questions = db.scalars(
-        query
     ).all()
-
-    # --------------------------------------------------------
-    # RESPONSE
-    # --------------------------------------------------------
 
     return [
         {
@@ -193,85 +151,58 @@ def check_practice_answer(
     _: User = Depends(require_student),
 ):
 
-    # --------------------------------------------------------
-    # SINGLE QUERY
-    #
-    # Fetch:
-    # - selected option
-    # - whether selected option is correct
-    # - correct option ID
-    # - explanation
-    #
-    # This avoids multiple database round trips.
-    # --------------------------------------------------------
+    question = db.scalar(
+        select(Question)
+        .where(
+            Question.id == data.question_id,
+            Question.is_active.is_(True),
+        )
+    )
 
-    correct_option_subquery = (
-        select(Option.id)
+    if not question:
+        raise HTTPException(
+            status_code=404,
+            detail="Question not found.",
+        )
+
+    selected_option = db.scalar(
+        select(Option)
+        .where(
+            Option.id == data.option_id,
+            Option.question_id
+            == data.question_id,
+        )
+    )
+
+    if not selected_option:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid option for this question.",
+        )
+
+    correct_option = db.scalar(
+        select(Option)
         .where(
             Option.question_id
             == data.question_id,
             Option.is_correct.is_(True),
         )
-        .limit(1)
-        .scalar_subquery()
     )
 
-    result = db.execute(
-        select(
-            Option.id,
-            Option.is_correct,
-            correct_option_subquery.label(
-                "correct_option_id"
-            ),
-            Question.explanation,
-        )
-        .join(
-            Question,
-            Question.id
-            == Option.question_id,
-        )
-        .where(
-            Option.id
-            == data.option_id,
-            Option.question_id
-            == data.question_id,
-            Question.is_active.is_(True),
-        )
-    ).first()
-
-    # --------------------------------------------------------
-    # VALIDATE
-    # --------------------------------------------------------
-
-    if not result:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid option for this question",
-        )
-
-    (
-        selected_option_id,
-        is_correct,
-        correct_option_id,
-        explanation,
-    ) = result
-
-    # --------------------------------------------------------
-    # NO CORRECT OPTION CONFIGURED
-    # --------------------------------------------------------
-
-    if correct_option_id is None:
+    if not correct_option:
         raise HTTPException(
             status_code=500,
-            detail="Question has no correct option configured",
+            detail=(
+                "Question has no correct "
+                "option configured."
+            ),
         )
 
-    # --------------------------------------------------------
-    # RESPONSE
-    # --------------------------------------------------------
-
     return {
-        "correct": bool(is_correct),
-        "correct_option_id": correct_option_id,
-        "explanation": explanation,
+        "correct": (
+            selected_option.id
+            == correct_option.id
+        ),
+        "correct_option_id": correct_option.id,
+        "explanation": question.explanation,
     }
