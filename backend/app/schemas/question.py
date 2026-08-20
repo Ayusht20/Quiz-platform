@@ -15,16 +15,31 @@ class OptionResponse(BaseModel):
 
 
 class QuestionCreate(BaseModel):
+
     skill_id: int
-    question_text: str = Field(min_length=5)
+
+    topic: str = Field(
+        min_length=2,
+        max_length=150,
+    )
+
+    question_text: str = Field(
+        min_length=5,
+    )
+
     difficulty: str = "EASY"
-    marks: int = Field(default=1, ge=1)
+
+    marks: int = Field(
+        default=1,
+        ge=1,
+    )
+
     explanation: str | None = None
+
     options: list[OptionCreate] = Field(
         min_length=2,
         max_length=6,
     )
-
 
 class QuestionResponse(BaseModel):
     id: int
