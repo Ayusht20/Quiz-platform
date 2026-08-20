@@ -1,10 +1,14 @@
 import api from "../api/axios";
 
+
 // ============================================================
 // GET PRACTICE TOPICS
 // ============================================================
 
-export const getPracticeTopics = async (skillId) => {
+export const getPracticeTopics = async (
+  skillId
+) => {
+
   if (!skillId) {
     return [];
   }
