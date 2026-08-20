@@ -25,11 +25,6 @@ const navigation = [
     icon: BookOpen,
   },
   {
-    label: "Battles",
-    path: "/admin/assessments",
-    icon: Swords,
-  },
-  {
     label: "Quests",
     path: "/admin/quests",
     icon: Target,

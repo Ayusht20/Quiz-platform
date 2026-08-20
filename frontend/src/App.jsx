@@ -35,9 +35,7 @@ import Achievements from "./pages/student/Achievements";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/Dashboard";
 
-import Assessments from "./pages/admin/Assessments";
-import CreateAssessment from "./pages/admin/CreateAssessment";
-import AssessmentDetails from "./pages/admin/AssessmentDetails";
+
 
 import Questions from "./pages/admin/Questions";
 import QuestionEditor from "./pages/admin/QuestionEditor";
@@ -214,39 +212,6 @@ function App() {
                   <QuestionEditor />
                 }
               />
-
-
-              {/* =============================================== */}
-              {/* BATTLES / ASSESSMENTS */}
-              {/* =============================================== */}
-
-              <Route
-                path="assessments"
-                element={
-                  <Assessments />
-                }
-              />
-
-
-              {/* CREATE BATTLE */}
-
-              <Route
-                path="assessments/create"
-                element={
-                  <CreateAssessment />
-                }
-              />
-
-
-              {/* MANAGE BATTLE */}
-
-              <Route
-                path="assessments/:assessmentId"
-                element={
-                  <AssessmentDetails />
-                }
-              />
-
 
               {/* =============================================== */}
               {/* QUEST MANAGEMENT */}
