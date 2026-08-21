@@ -9,7 +9,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 
 import ProtectedRoute from "./components/ProtectedRoute";
-
+import BattleSetup from "./pages/student/BattleSetup";
 // ============================================================
 // AUTH
 // ============================================================
@@ -27,6 +27,7 @@ import Battle from "./pages/student/Battle";
 import SkillTree from "./pages/student/SkillTree";
 import Quests from "./pages/student/Quests";
 import Achievements from "./pages/student/Achievements";
+import PracticeQuestions from "./pages/student/PracticeQuestions";
 
 // ============================================================
 // ADMIN
@@ -110,7 +111,14 @@ function App() {
                 </ProtectedRoute>
               }
             />
-
+            <Route
+  path="/practice/questions"
+  element={
+    <ProtectedRoute role="STUDENT">
+      <PracticeQuestions />
+    </ProtectedRoute>
+  }
+/>
             <Route
               path="/practice/:assessmentId"
               element={
@@ -132,7 +140,14 @@ function App() {
               }
             />
 
-
+<Route
+  path="/battle/setup"
+  element={
+    <ProtectedRoute role="STUDENT">
+      <BattleSetup />
+    </ProtectedRoute>
+  }
+/>
             {/* QUESTS */}
 
             <Route
