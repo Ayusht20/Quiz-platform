@@ -1,26 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowRight,
   Clock3,
-  Plus,
   Search,
   Swords,
   Trophy,
-  Users,
+  Database,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
 
 import {
   getAllAssessments,
 } from "../../services/adminAssessmentService";
 
-
 export default function Assessments() {
-  const navigate = useNavigate();
-
-  const [assessments, setAssessments] =
-    useState([]);
+  const [assessments, setAssessments] = useState([]);
 
   const [loading, setLoading] =
     useState(true);
@@ -28,78 +21,127 @@ export default function Assessments() {
   const [search, setSearch] =
     useState("");
 
+  const [error, setError] =
+    useState("");
+
   const loadAssessments = async () => {
     try {
       setLoading(true);
+      setError("");
 
       const data =
         await getAllAssessments();
 
-      setAssessments(data);
-    } catch (error) {
-      console.error(
-        "Failed to load assessments:",
-        error
+      setAssessments(
+        Array.isArray(data)
+          ? data
+          : []
       );
+
+    } catch (err) {
+      console.error(
+        "Failed to load generated battles:",
+        err
+      );
+
+      setError(
+        "Unable to load generated battles."
+      );
+
     } finally {
       setLoading(false);
     }
   };
 
-
   useEffect(() => {
     loadAssessments();
   }, []);
 
-
   const filteredAssessments =
-    assessments.filter((assessment) =>
-      assessment.title
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
+    useMemo(() => {
+      const value =
+        search.trim().toLowerCase();
 
+      if (!value) {
+        return assessments;
+      }
+
+      return assessments.filter(
+        (assessment) =>
+          assessment.title
+            ?.toLowerCase()
+            .includes(value) ||
+          assessment.difficulty
+            ?.toLowerCase()
+            .includes(value) ||
+          assessment.topic
+            ?.toLowerCase()
+            .includes(value)
+      );
+    }, [assessments, search]);
 
   return (
     <div className="min-h-full bg-[var(--bg)] text-[var(--text)]">
 
       <main className="mx-auto max-w-7xl px-5 py-8 lg:px-8">
 
+        {/* ================================================== */}
         {/* HEADER */}
+        {/* ================================================== */}
 
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <div>
 
-          <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[var(--primary)]">
+            Automatic System
+          </p>
 
-            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[var(--primary)]">
-              Admin Control
-            </p>
+          <h1 className="mt-2 text-3xl font-black">
+            Generated Battles
+          </h1>
 
-            <h1 className="mt-2 text-3xl font-black">
-              Assessments
-            </h1>
-
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Create and manage battles for SkillArena.
-            </p>
-
-          </div>
-
-
-          <button
-            onClick={() =>
-              navigate("/admin/assessments/create")
-            }
-            className="flex items-center justify-center gap-2 bg-[var(--primary)] px-5 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:brightness-110"
-          >
-            <Plus size={16} />
-            Create Battle
-          </button>
+          <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
+            Battles are generated automatically when students
+            choose a skill and difficulty. Admins do not create
+            battles manually.
+          </p>
 
         </div>
 
+        {/* ================================================== */}
+        {/* INFO BANNER */}
+        {/* ================================================== */}
 
+        <div className="mt-8 border border-[var(--primary)]/20 bg-[var(--primary-soft)] p-5">
+
+          <div className="flex items-start gap-3">
+
+            <Database
+              size={18}
+              className="mt-0.5 shrink-0 text-[var(--primary)]"
+            />
+
+            <div>
+
+              <p className="text-xs font-black">
+                How battle generation works
+              </p>
+
+              <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                Question Bank → Skill + Difficulty →
+                Random Question Selection → Battle.
+                Topics are intentionally not selected during
+                battle generation.
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* ================================================== */}
         {/* SEARCH */}
+        {/* ================================================== */}
 
         <div className="mt-8 flex items-center gap-3 border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
 
@@ -113,19 +155,34 @@ export default function Assessments() {
             onChange={(event) =>
               setSearch(event.target.value)
             }
-            placeholder="Search battles..."
+            placeholder="Search generated battles..."
             className="w-full bg-transparent text-sm outline-none placeholder:text-[var(--muted)]"
           />
 
         </div>
 
+        {/* ================================================== */}
+        {/* ERROR */}
+        {/* ================================================== */}
 
-        {/* CONTENT */}
+        {error && (
+          <div className="mt-5 border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-4 text-sm text-[var(--danger)]">
+            {error}
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* LOADING */}
+        {/* ================================================== */}
 
         {loading ? (
 
-          <div className="mt-10 text-center text-sm text-[var(--muted)]">
-            Loading assessments...
+          <div className="mt-10 border border-[var(--border)] bg-[var(--surface)] p-12 text-center">
+
+            <p className="text-sm text-[var(--muted)]">
+              Loading generated battles...
+            </p>
+
           </div>
 
         ) : filteredAssessments.length === 0 ? (
@@ -138,23 +195,13 @@ export default function Assessments() {
             />
 
             <h2 className="mt-4 font-black">
-              No assessments found
+              No generated battles yet
             </h2>
 
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Create your first SkillArena battle.
+            <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">
+              This is normal. Battles will appear here after
+              students start playing them.
             </p>
-
-            <button
-              onClick={() =>
-                navigate(
-                  "/admin/assessments/create"
-                )
-              }
-              className="mt-6 bg-[var(--primary)] px-5 py-3 text-xs font-black text-white"
-            >
-              Create Battle
-            </button>
 
           </div>
 
@@ -176,10 +223,12 @@ export default function Assessments() {
                     y: 0,
                   }}
                   transition={{
-                    delay: index * 0.05,
+                    delay: index * 0.04,
                   }}
                   className="border border-[var(--border)] bg-[var(--surface)] p-6"
                 >
+
+                  {/* TOP */}
 
                   <div className="flex items-start justify-between">
 
@@ -187,20 +236,13 @@ export default function Assessments() {
                       <Swords size={19} />
                     </div>
 
-                    <span
-                      className={`px-2.5 py-1 text-[9px] font-black uppercase ${
-                        assessment.is_published
-                          ? "bg-[var(--success)]/10 text-[var(--success)]"
-                          : "bg-[var(--surface-soft)] text-[var(--muted)]"
-                      }`}
-                    >
-                      {assessment.is_published
-                        ? "Published"
-                        : "Draft"}
+                    <span className="bg-[var(--success)]/10 px-2.5 py-1 text-[9px] font-black uppercase text-[var(--success)]">
+                      Auto Generated
                     </span>
 
                   </div>
 
+                  {/* TITLE */}
 
                   <h2 className="mt-5 text-lg font-black">
                     {assessment.title}
@@ -208,11 +250,38 @@ export default function Assessments() {
 
                   <p className="mt-2 line-clamp-2 text-sm text-[var(--muted)]">
                     {assessment.description ||
-                      "No description provided."}
+                      "Automatically generated SkillArena battle."}
                   </p>
 
+                  {/* DETAILS */}
 
                   <div className="mt-6 grid grid-cols-2 gap-3">
+
+                    <div className="bg-[var(--surface-soft)] p-3">
+
+                      <p className="text-[9px] font-black uppercase text-[var(--muted)]">
+                        Difficulty
+                      </p>
+
+                      <p className="mt-2 text-xs font-black">
+                        {assessment.difficulty ||
+                          "—"}
+                      </p>
+
+                    </div>
+
+                    <div className="bg-[var(--surface-soft)] p-3">
+
+                      <p className="text-[9px] font-black uppercase text-[var(--muted)]">
+                        Questions
+                      </p>
+
+                      <p className="mt-2 text-xs font-black">
+                        {assessment.question_count ||
+                          "—"}
+                      </p>
+
+                    </div>
 
                     <div className="bg-[var(--surface-soft)] p-3">
 
@@ -222,11 +291,12 @@ export default function Assessments() {
                       />
 
                       <p className="mt-2 text-xs font-black">
-                        {assessment.duration_minutes} min
+                        {assessment.duration_minutes ||
+                          "—"}{" "}
+                        min
                       </p>
 
                     </div>
-
 
                     <div className="bg-[var(--surface-soft)] p-3">
 
@@ -236,25 +306,26 @@ export default function Assessments() {
                       />
 
                       <p className="mt-2 text-xs font-black">
-                        {assessment.passing_percentage}%
+                        {assessment.passing_percentage ||
+                          60}
+                        %
                       </p>
 
                     </div>
 
                   </div>
 
+                  {/* TOPIC */}
 
-                  <button
-                    onClick={() =>
-                      navigate(
-                        `/admin/assessments/${assessment.id}`
-                      )
-                    }
-                    className="mt-6 flex w-full items-center justify-center gap-2 border border-[var(--border)] px-4 py-3 text-xs font-black uppercase tracking-wider transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
-                  >
-                    Manage Battle
-                    <ArrowRight size={14} />
-                  </button>
+                  {assessment.topic && (
+                    <div className="mt-4">
+
+                      <span className="inline-block border border-[var(--border)] px-3 py-1 text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
+                        Topic: {assessment.topic}
+                      </span>
+
+                    </div>
+                  )}
 
                 </motion.div>
 

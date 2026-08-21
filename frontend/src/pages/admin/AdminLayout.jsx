@@ -2,7 +2,6 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   BookOpen,
-  Swords,
   Users,
   Brain,
   BarChart3,
@@ -58,7 +57,9 @@ export default function AdminLayout() {
   return (
     <div className="flex min-h-screen bg-[var(--bg)] text-[var(--text)]">
 
+      {/* ====================================================== */}
       {/* SIDEBAR */}
+      {/* ====================================================== */}
 
       <aside className="hidden w-64 shrink-0 border-r border-[var(--border)] bg-[var(--surface)] lg:flex lg:flex-col">
 
@@ -86,6 +87,10 @@ export default function AdminLayout() {
 
         <nav className="flex-1 space-y-1 px-3 py-6">
 
+          <p className="mb-3 px-4 text-[9px] font-black uppercase tracking-[0.22em] text-[var(--muted)]">
+            Management
+          </p>
+
           {navigation.map((item) => {
             const Icon = item.icon;
 
@@ -109,9 +114,23 @@ export default function AdminLayout() {
 
         </nav>
 
-        {/* USER */}
+        {/* INFORMATION */}
 
         <div className="border-t border-[var(--border)] p-4">
+
+          <div className="mb-4 border border-[var(--border)] bg-[var(--surface-soft)] p-3">
+
+            <p className="text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
+              Battle System
+            </p>
+
+            <p className="mt-2 text-xs font-bold leading-5">
+              Battles are generated automatically for students.
+            </p>
+
+          </div>
+
+          {/* USER */}
 
           <div className="mb-4 flex items-center gap-3">
 
@@ -145,7 +164,9 @@ export default function AdminLayout() {
 
       </aside>
 
+      {/* ====================================================== */}
       {/* MOBILE TOP BAR */}
+      {/* ====================================================== */}
 
       <div className="fixed left-0 right-0 top-0 z-40 flex h-16 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-5 lg:hidden">
 
@@ -170,7 +191,9 @@ export default function AdminLayout() {
 
       </div>
 
+      {/* ====================================================== */}
       {/* CONTENT */}
+      {/* ====================================================== */}
 
       <main className="min-w-0 flex-1 pt-16 lg:pt-0">
         <Outlet />
