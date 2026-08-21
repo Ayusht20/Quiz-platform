@@ -2,12 +2,17 @@ import api from "../api/axios";
 
 // ============================================================
 // GET PRACTICE TOPICS
+//
+// Skill + Difficulty
+//      ↓
+// Only topics that actually have questions
 // ============================================================
 
 export const getPracticeTopics = async (
-  skillId
+  skillId,
+  difficulty
 ) => {
-  if (!skillId) {
+  if (!skillId || !difficulty) {
     return [];
   }
 
@@ -16,6 +21,7 @@ export const getPracticeTopics = async (
     {
       params: {
         skill_id: skillId,
+        difficulty,
       },
     }
   );
@@ -23,8 +29,11 @@ export const getPracticeTopics = async (
   return response.data;
 };
 
+
 // ============================================================
 // GET PRACTICE QUESTIONS
+//
+// Skill + Difficulty + Topic
 // ============================================================
 
 export const getPracticeQuestions = async ({
@@ -42,12 +51,12 @@ export const getPracticeQuestions = async ({
     params.skill_id = skillId;
   }
 
-  if (topic) {
-    params.topic = topic;
-  }
-
   if (difficulty) {
     params.difficulty = difficulty;
+  }
+
+  if (topic) {
+    params.topic = topic;
   }
 
   const response = await api.get(
@@ -59,6 +68,7 @@ export const getPracticeQuestions = async ({
 
   return response.data;
 };
+
 
 // ============================================================
 // CHECK PRACTICE ANSWER

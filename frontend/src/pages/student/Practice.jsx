@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+
 import {
   ArrowLeft,
   BookOpen,
@@ -10,6 +11,7 @@ import {
   Sparkles,
   Target,
 } from "lucide-react";
+
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -20,7 +22,9 @@ import {
   getPracticeTopics,
 } from "../../services/practiceService";
 
+
 export default function Practice() {
+
   const navigate = useNavigate();
 
   const [skills, setSkills] = useState([]);
@@ -29,11 +33,11 @@ export default function Practice() {
   const [selectedSkill, setSelectedSkill] =
     useState(null);
 
-  const [selectedTopic, setSelectedTopic] =
+  const [difficulty, setDifficulty] =
     useState("");
 
-  const [difficulty, setDifficulty] =
-    useState("EASY");
+  const [selectedTopic, setSelectedTopic] =
+    useState("");
 
   const [loadingSkills, setLoadingSkills] =
     useState(true);
@@ -41,15 +45,20 @@ export default function Practice() {
   const [loadingTopics, setLoadingTopics] =
     useState(false);
 
-  const [error, setError] = useState("");
+  const [error, setError] =
+    useState("");
+
 
   // ============================================================
   // LOAD SKILLS
   // ============================================================
 
   useEffect(() => {
+
     const loadSkills = async () => {
+
       try {
+
         setLoadingSkills(true);
         setError("");
 
@@ -57,74 +66,146 @@ export default function Practice() {
           await getAvailableSkills();
 
         setSkills(data || []);
+
       } catch (err) {
-        console.error(err);
+
+        console.error(
+          "Failed to load skills:",
+          err
+        );
 
         setError(
           "Unable to load available skills."
         );
+
       } finally {
+
         setLoadingSkills(false);
+
       }
     };
 
     loadSkills();
+
   }, []);
 
+
   // ============================================================
-  // LOAD TOPICS
+  // SELECT SKILL
   // ============================================================
 
-  const handleSkillSelect = async (skill) => {
+  const handleSkillSelect = (skill) => {
+
     setSelectedSkill(skill);
+
+    // Reset everything below skill.
+    setDifficulty("");
+    setSelectedTopic("");
+    setTopics([]);
+
+    setError("");
+  };
+
+
+  // ============================================================
+  // SELECT DIFFICULTY
+  // ============================================================
+
+  const handleDifficultySelect = async (
+    selectedDifficulty
+  ) => {
+
+    if (!selectedSkill) {
+      return;
+    }
+
+    setDifficulty(
+      selectedDifficulty
+    );
+
+    // Very important:
+    // Old topic selection must be cleared
+    // whenever difficulty changes.
+
     setSelectedTopic("");
     setTopics([]);
     setError("");
 
     try {
+
       setLoadingTopics(true);
 
       const data =
         await getPracticeTopics(
-          skill.id
+          selectedSkill.id,
+          selectedDifficulty
         );
 
       setTopics(data || []);
+
     } catch (err) {
-      console.error(err);
+
+      console.error(
+        "Failed to load topics:",
+        err
+      );
 
       setError(
-        "Unable to load topics for this skill."
+        "Unable to load topics for this difficulty."
       );
+
     } finally {
+
       setLoadingTopics(false);
+
     }
   };
+
 
   // ============================================================
   // START PRACTICE
   // ============================================================
 
   const startPractice = () => {
-    if (!selectedSkill) {
+
+    if (
+      !selectedSkill ||
+      !difficulty ||
+      !selectedTopic
+    ) {
+
       return;
+
     }
 
-    navigate("/practice/questions", {
-      state: {
-        skillId: selectedSkill.id,
-        skillName: selectedSkill.name,
-        topic: selectedTopic,
-        difficulty,
-      },
-    });
+    navigate(
+      "/practice/questions",
+      {
+        state: {
+          skillId:
+            selectedSkill.id,
+
+          skillName:
+            selectedSkill.name,
+
+          topic:
+            selectedTopic,
+
+          difficulty,
+        },
+      }
+    );
   };
+
 
   // ============================================================
   // ICON
   // ============================================================
 
-  const getSkillIcon = (name = "") => {
+  const getSkillIcon = (
+    name = ""
+  ) => {
+
     const value =
       name.toLowerCase();
 
@@ -132,7 +213,9 @@ export default function Practice() {
       value.includes("sql") ||
       value.includes("database")
     ) {
+
       return Database;
+
     }
 
     if (
@@ -141,22 +224,28 @@ export default function Practice() {
       value.includes("python") ||
       value.includes("java")
     ) {
+
       return Code2;
+
     }
 
     return Layers3;
   };
+
 
   // ============================================================
   // RENDER
   // ============================================================
 
   return (
+
     <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
 
       <main className="mx-auto max-w-7xl px-5 py-8 lg:px-8 lg:py-12">
 
+        {/* ================================================== */}
         {/* HEADER */}
+        {/* ================================================== */}
 
         <div className="flex items-center justify-between">
 
@@ -166,9 +255,13 @@ export default function Practice() {
             }
             className="flex items-center gap-2 text-xs font-bold text-[var(--muted)] transition hover:text-[var(--text)]"
           >
+
             <ArrowLeft size={16} />
+
             Dashboard
+
           </button>
+
 
           <div className="flex items-center gap-2">
 
@@ -185,7 +278,10 @@ export default function Practice() {
 
         </div>
 
+
+        {/* ================================================== */}
         {/* HERO */}
+        {/* ================================================== */}
 
         <section className="mt-12">
 
@@ -202,51 +298,48 @@ export default function Practice() {
 
           </div>
 
+
           <h1 className="mt-3 text-3xl font-black sm:text-4xl">
             Practice Your Skills
           </h1>
 
+
           <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-            Practice as much as you want. Choose a
-            skill, focus on a topic, and improve your
-            accuracy before entering the battle.
+            Select a skill and difficulty first.
+            We'll show only the topics that have
+            questions available at that level.
           </p>
 
         </section>
 
+
+        {/* ================================================== */}
         {/* ERROR */}
+        {/* ================================================== */}
 
         {error && (
+
           <div className="mt-8 border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-4 text-sm text-[var(--danger)]">
             {error}
           </div>
+
         )}
 
-        {/* SKILLS */}
+
+        {/* ================================================== */}
+        {/* STEP 01 — SKILL */}
+        {/* ================================================== */}
 
         <section className="mt-10">
 
-          <div className="flex items-end justify-between">
+          <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
+            Step 01
+          </p>
 
-            <div>
+          <h2 className="mt-1 text-xl font-black">
+            Choose a Skill
+          </h2>
 
-              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
-                Step 01
-              </p>
-
-              <h2 className="mt-1 text-xl font-black">
-                Choose a Skill
-              </h2>
-
-            </div>
-
-            {selectedSkill && (
-              <span className="text-xs font-bold text-[var(--primary)]">
-                {selectedSkill.name}
-              </span>
-            )}
-
-          </div>
 
           {loadingSkills ? (
 
@@ -277,76 +370,96 @@ export default function Practice() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 
-              {skills.map((skill, index) => {
+              {skills.map(
+                (skill, index) => {
 
-                const Icon =
-                  getSkillIcon(skill.name);
+                  const Icon =
+                    getSkillIcon(
+                      skill.name
+                    );
 
-                const isSelected =
-                  selectedSkill?.id === skill.id;
+                  const isSelected =
+                    selectedSkill?.id ===
+                    skill.id;
 
-                return (
-                  <motion.button
-                    key={skill.id}
-                    initial={{
-                      opacity: 0,
-                      y: 12,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                    }}
-                    transition={{
-                      delay: index * 0.04,
-                    }}
-                    onClick={() =>
-                      handleSkillSelect(skill)
-                    }
-                    className={`group relative overflow-hidden border p-5 text-left transition ${
-                      isSelected
-                        ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-                        : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/50"
-                    }`}
-                  >
+                  return (
 
-                    <div
-                      className={`flex h-11 w-11 items-center justify-center ${
+                    <motion.button
+                      key={skill.id}
+                      initial={{
+                        opacity: 0,
+                        y: 12,
+                      }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                      }}
+                      transition={{
+                        delay:
+                          index * 0.04,
+                      }}
+                      onClick={() =>
+                        handleSkillSelect(
+                          skill
+                        )
+                      }
+                      className={`group relative overflow-hidden border p-5 text-left transition ${
                         isSelected
-                          ? "bg-[var(--primary)] text-white"
-                          : "bg-[var(--surface-soft)] text-[var(--primary)]"
+                          ? "border-[var(--primary)] bg-[var(--primary-soft)]"
+                          : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/50"
                       }`}
                     >
-                      <Icon size={19} />
-                    </div>
 
-                    <h3 className="mt-5 text-sm font-black">
-                      {skill.name}
-                    </h3>
+                      <div
+                        className={`flex h-11 w-11 items-center justify-center ${
+                          isSelected
+                            ? "bg-[var(--primary)] text-white"
+                            : "bg-[var(--surface-soft)] text-[var(--primary)]"
+                        }`}
+                      >
 
-                    <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]">
-                      {skill.description ||
-                        "Practice questions and improve your skill."}
-                    </p>
+                        <Icon size={19} />
 
-                    <ChevronRight
-                      size={15}
-                      className={`absolute right-4 top-5 transition ${
-                        isSelected
-                          ? "text-[var(--primary)]"
-                          : "text-[var(--muted)] group-hover:text-[var(--primary)]"
-                      }`}
-                    />
+                      </div>
 
-                  </motion.button>
-                );
-              })}
+
+                      <h3 className="mt-5 text-sm font-black">
+                        {skill.name}
+                      </h3>
+
+
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--muted)]">
+                        {skill.description ||
+                          "Practice questions and improve your skill."}
+                      </p>
+
+
+                      <ChevronRight
+                        size={15}
+                        className={`absolute right-4 top-5 ${
+                          isSelected
+                            ? "text-[var(--primary)]"
+                            : "text-[var(--muted)]"
+                        }`}
+                      />
+
+                    </motion.button>
+
+                  );
+
+                }
+              )}
 
             </div>
+
           )}
 
         </section>
 
-        {/* TOPIC */}
+
+        {/* ================================================== */}
+        {/* STEP 02 — DIFFICULTY */}
+        {/* ================================================== */}
 
         {selectedSkill && (
 
@@ -362,188 +475,218 @@ export default function Practice() {
             className="mt-12"
           >
 
-            <div>
+            <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
+              Step 02
+            </p>
 
-              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
-                Step 02
-              </p>
+            <h2 className="mt-1 text-xl font-black">
+              Choose Difficulty
+            </h2>
 
-              <h2 className="mt-1 text-xl font-black">
-                Choose a Topic
-              </h2>
 
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Focus your practice on a specific area.
-              </p>
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              Topics will be loaded according to this level.
+            </p>
+
+
+            <div className="mt-6 grid max-w-3xl gap-3 sm:grid-cols-3">
+
+              {[
+                {
+                  value: "EASY",
+                  label: "Easy",
+                  description:
+                    "Build your fundamentals.",
+                },
+                {
+                  value: "MEDIUM",
+                  label: "Intermediate",
+                  description:
+                    "Challenge your knowledge.",
+                },
+                {
+                  value: "HARD",
+                  label: "Hard",
+                  description:
+                    "Push your limits.",
+                },
+              ].map(
+                (item) => {
+
+                  const active =
+                    difficulty ===
+                    item.value;
+
+                  return (
+
+                    <button
+                      key={item.value}
+                      onClick={() =>
+                        handleDifficultySelect(
+                          item.value
+                        )
+                      }
+                      className={`border p-5 text-left transition ${
+                        active
+                          ? "border-[var(--primary)] bg-[var(--primary-soft)]"
+                          : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/50"
+                      }`}
+                    >
+
+                      <div className="flex items-center justify-between">
+
+                        <span
+                          className={`text-sm font-black ${
+                            active
+                              ? "text-[var(--primary)]"
+                              : ""
+                          }`}
+                        >
+                          {item.label}
+                        </span>
+
+
+                        {active && (
+                          <span className="h-2 w-2 rounded-full bg-[var(--primary)]" />
+                        )}
+
+                      </div>
+
+
+                      <p className="mt-2 text-[10px] leading-4 text-[var(--muted)]">
+                        {item.description}
+                      </p>
+
+                    </button>
+
+                  );
+
+                }
+              )}
 
             </div>
+
+          </motion.section>
+
+        )}
+
+
+        {/* ================================================== */}
+        {/* STEP 03 — TOPIC */}
+        {/* ================================================== */}
+
+        {selectedSkill &&
+          difficulty && (
+
+          <motion.section
+            initial={{
+              opacity: 0,
+              y: 15,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            className="mt-12"
+          >
+
+            <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
+              Step 03
+            </p>
+
+            <h2 className="mt-1 text-xl font-black">
+              Choose a Topic
+            </h2>
+
+
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              Only topics containing{" "}
+              <span className="font-bold text-[var(--text)]">
+                {difficulty.toLowerCase()}
+              </span>{" "}
+              questions are shown.
+            </p>
+
 
             {loadingTopics ? (
 
               <div className="mt-6 border border-[var(--border)] bg-[var(--surface)] p-8 text-center text-sm text-[var(--muted)]">
-                Loading topics...
+                Finding available topics...
               </div>
 
             ) : topics.length === 0 ? (
 
-              <div className="mt-6 border border-[var(--border)] bg-[var(--surface)] p-8 text-center text-sm text-[var(--muted)]">
-                No topics found for this skill.
+              <div className="mt-6 border border-[var(--border)] bg-[var(--surface)] p-8 text-center">
+
+                <Target
+                  size={28}
+                  className="mx-auto text-[var(--muted)]"
+                />
+
+                <p className="mt-3 text-sm font-bold">
+                  No topics available
+                </p>
+
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  There are no {difficulty.toLowerCase()} questions
+                  for this skill yet.
+                </p>
+
               </div>
 
             ) : (
 
               <div className="mt-6 flex flex-wrap gap-3">
 
-                <button
-                  onClick={() =>
-                    setSelectedTopic("")
-                  }
-                  className={`border px-4 py-3 text-xs font-black transition ${
-                    selectedTopic === ""
-                      ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-                      : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--text)]"
-                  }`}
-                >
-                  All Topics
-                </button>
+                {topics.map(
+                  (item) => {
 
-                {topics.map((topic) => {
+                    const topicName =
+                      typeof item ===
+                      "string"
+                        ? item
+                        : item.topic;
 
-                  const topicName =
-                    typeof topic === "string"
-                      ? topic
-                      : topic.topic;
+                    return (
 
-                  return (
-                    <button
-                      key={topicName}
-                      onClick={() =>
-                        setSelectedTopic(
+                      <button
+                        key={topicName}
+                        onClick={() =>
+                          setSelectedTopic(
+                            topicName
+                          )
+                        }
+                        className={`border px-5 py-3 text-xs font-black transition ${
+                          selectedTopic ===
                           topicName
-                        )
-                      }
-                      className={`border px-4 py-3 text-xs font-black transition ${
-                        selectedTopic === topicName
-                          ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
-                          : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--text)]"
-                      }`}
-                    >
-                      {topicName}
-                    </button>
-                  );
-                })}
+                            ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                            : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--text)]"
+                        }`}
+                      >
+                        {topicName}
+                      </button>
+
+                    );
+
+                  }
+                )}
 
               </div>
+
             )}
 
           </motion.section>
 
         )}
 
-        {/* DIFFICULTY */}
 
-        {selectedSkill && (
+        {/* ================================================== */}
+        {/* START PRACTICE */}
+        {/* ================================================== */}
 
-          <motion.section
-            initial={{
-              opacity: 0,
-              y: 15,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            transition={{
-              delay: 0.05,
-            }}
-            className="mt-12"
-          >
-
-            <div>
-
-              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
-                Step 03
-              </p>
-
-              <h2 className="mt-1 text-xl font-black">
-                Choose Difficulty
-              </h2>
-
-            </div>
-
-            <div className="mt-6 grid max-w-2xl gap-3 sm:grid-cols-3">
-
-              {[
-                {
-                  value: "EASY",
-                  label: "Easy",
-                  description: "Build your fundamentals.",
-                },
-                {
-                  value: "INTERMEDIATE",
-                  label: "Intermediate",
-                  description: "Challenge your knowledge.",
-                },
-                {
-                  value: "HARD",
-                  label: "Hard",
-                  description: "Push your limits.",
-                },
-              ].map((item) => {
-
-                const active =
-                  difficulty === item.value;
-
-                return (
-                  <button
-                    key={item.value}
-                    onClick={() =>
-                      setDifficulty(
-                        item.value
-                      )
-                    }
-                    className={`border p-4 text-left transition ${
-                      active
-                        ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-                        : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/50"
-                    }`}
-                  >
-
-                    <div className="flex items-center justify-between">
-
-                      <span
-                        className={`text-xs font-black ${
-                          active
-                            ? "text-[var(--primary)]"
-                            : ""
-                        }`}
-                      >
-                        {item.label}
-                      </span>
-
-                      {active && (
-                        <span className="h-2 w-2 rounded-full bg-[var(--primary)]" />
-                      )}
-
-                    </div>
-
-                    <p className="mt-2 text-[10px] leading-4 text-[var(--muted)]">
-                      {item.description}
-                    </p>
-
-                  </button>
-                );
-              })}
-
-            </div>
-
-          </motion.section>
-
-        )}
-
-        {/* PRACTICE CTA */}
-
-        {selectedSkill && (
+        {selectedSkill &&
+          difficulty &&
+          selectedTopic && (
 
           <motion.section
             initial={{
@@ -553,9 +696,6 @@ export default function Practice() {
             animate={{
               opacity: 1,
               y: 0,
-            }}
-            transition={{
-              delay: 0.1,
             }}
             className="mt-12"
           >
@@ -577,26 +717,39 @@ export default function Practice() {
 
                 </div>
 
+
                 <p className="mt-2 text-sm text-[var(--muted)]">
 
-                  {selectedTopic
-                    ? `Practice ${selectedTopic} questions`
-                    : `Practice ${selectedSkill.name} questions`}
-
-                  {" "}at{" "}
-
-                  {difficulty.toLowerCase()} difficulty.
+                  Practice{" "}
+                  <span className="font-bold text-[var(--text)]">
+                    {selectedTopic}
+                  </span>{" "}
+                  questions from{" "}
+                  <span className="font-bold text-[var(--text)]">
+                    {selectedSkill.name}
+                  </span>{" "}
+                  at{" "}
+                  <span className="font-bold text-[var(--text)]">
+                    {difficulty.toLowerCase()}
+                  </span>{" "}
+                  difficulty.
 
                 </p>
 
               </div>
 
+
               <button
                 onClick={startPractice}
                 className="flex items-center justify-center gap-2 bg-[var(--primary)] px-6 py-3 text-xs font-black uppercase tracking-wider text-white transition hover:brightness-110"
               >
+
                 Start Practice
-                <ChevronRight size={15} />
+
+                <ChevronRight
+                  size={15}
+                />
+
               </button>
 
             </div>
@@ -608,5 +761,6 @@ export default function Practice() {
       </main>
 
     </div>
+
   );
 }

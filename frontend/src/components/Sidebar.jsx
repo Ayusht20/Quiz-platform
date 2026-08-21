@@ -8,6 +8,7 @@ import {
   Settings,
   LogOut,
   Zap,
+  BookOpen
 } from "lucide-react";
 
 import { NavLink } from "react-router-dom";
@@ -22,11 +23,16 @@ const navigation = [
     path: "/dashboard",
     icon: Home,
   },
-  {
-    name: "Battle",
-    path: "/practice",
-    icon: Swords,
-  },
+{
+  name: "Practice",
+  path: "/practice",
+  icon: BookOpen,
+},
+{
+  name: "Battle",
+  path: "/battle/setup",
+  icon: Swords,
+},
   {
     name: "Quests",
     path: "/quests",
