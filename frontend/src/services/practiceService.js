@@ -1,6 +1,5 @@
 import api from "../api/axios";
 
-
 // ============================================================
 // GET PRACTICE TOPICS
 // ============================================================
@@ -8,7 +7,6 @@ import api from "../api/axios";
 export const getPracticeTopics = async (
   skillId
 ) => {
-
   if (!skillId) {
     return [];
   }
@@ -24,7 +22,6 @@ export const getPracticeTopics = async (
 
   return response.data;
 };
-
 
 // ============================================================
 // GET PRACTICE QUESTIONS
@@ -62,7 +59,6 @@ export const getPracticeQuestions = async ({
 
   return response.data;
 };
-
 
 // ============================================================
 // CHECK PRACTICE ANSWER
