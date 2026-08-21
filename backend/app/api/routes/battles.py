@@ -27,6 +27,16 @@ router = APIRouter(
 
 # ============================================================
 # GENERATE AUTOMATIC BATTLE
+#
+# Student chooses:
+#
+#     Skill
+#       ↓
+#   Difficulty
+#       ↓
+#   Random questions
+#
+# Topic is NEVER selected by the student.
 # ============================================================
 
 @router.post(
@@ -39,6 +49,7 @@ def generate_battle(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
+
     # --------------------------------------------------------
     # VALIDATE SKILL
     # --------------------------------------------------------
@@ -59,13 +70,10 @@ def generate_battle(
     # --------------------------------------------------------
 
     difficulty = data.difficulty.strip().upper()
-
     allowed_difficulties = {
-        "BEGINNER",
         "EASY",
-        "INTERMEDIATE",
+        "MEDIUM",
         "HARD",
-        "EXPERT",
     }
 
     if difficulty not in allowed_difficulties:
@@ -84,32 +92,27 @@ def generate_battle(
     )
 
     # --------------------------------------------------------
-    # FIND ELIGIBLE QUESTIONS
+    # FIND QUESTIONS
+    #
+    # IMPORTANT:
+    #
+    # We DO NOT filter by topic.
+    #
+    # Therefore all topics belonging to:
+    #
+    # Skill + Difficulty
+    #
+    # can participate in the battle.
     # --------------------------------------------------------
 
-    query = (
+    questions = db.scalars(
         select(Question)
         .where(
             Question.skill_id == data.skill_id,
-            Question.is_active.is_(True),
             Question.difficulty == difficulty,
+            Question.is_active.is_(True),
         )
-    )
-
-    # --------------------------------------------------------
-    # OPTIONAL TOPIC
-    # --------------------------------------------------------
-
-    topic = None
-
-    if data.topic:
-        topic = data.topic.strip()
-
-        query = query.where(
-            Question.topic == topic
-        )
-
-    questions = db.scalars(query).all()
+    ).all()
 
     # --------------------------------------------------------
     # CHECK QUESTION AVAILABILITY
@@ -117,17 +120,12 @@ def generate_battle(
 
     if len(questions) < question_count:
 
-        topic_message = (
-            f" for topic '{topic}'"
-            if topic
-            else ""
-        )
-
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Not enough questions available"
-                f"{topic_message}. "
+                f"Not enough questions available "
+                f"for {skill.name} at "
+                f"{difficulty} level. "
                 f"Required: {question_count}, "
                 f"Available: {len(questions)}."
             ),
@@ -145,22 +143,22 @@ def generate_battle(
     # --------------------------------------------------------
     # CREATE INTERNAL ASSESSMENT
     #
-    # The student never manually creates this.
+    # Student never creates this manually.
     # --------------------------------------------------------
 
     assessment = Assessment(
         title=(
             f"{skill.name} "
-            f"{topic + ' ' if topic else ''}"
-            f"Battle"
+            f"{difficulty.title()} Battle"
         ),
         description=(
             f"Automatically generated "
-            f"{difficulty.lower()} battle."
+            f"{difficulty.lower()} battle "
+            f"covering available topics."
         ),
         assessment_type="BATTLE",
         skill_id=skill.id,
-        topic=topic,
+        topic=None,
         difficulty=difficulty,
         question_count=question_count,
         duration_minutes=data.duration_minutes,
@@ -173,7 +171,7 @@ def generate_battle(
     db.flush()
 
     # --------------------------------------------------------
-    # ATTACH QUESTIONS
+    # ATTACH RANDOM QUESTIONS
     # --------------------------------------------------------
 
     for index, question in enumerate(
@@ -204,7 +202,7 @@ def generate_battle(
         "title": assessment.title,
         "skill_id": skill.id,
         "skill_name": skill.name,
-        "topic": topic,
+        "topic": None,
         "difficulty": difficulty,
         "question_count": question_count,
         "duration_minutes": data.duration_minutes,

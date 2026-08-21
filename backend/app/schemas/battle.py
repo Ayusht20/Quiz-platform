@@ -3,13 +3,19 @@ from pydantic import BaseModel, Field
 
 # ============================================================
 # GENERATE BATTLE REQUEST
+#
+# Student chooses:
+#   1. Skill
+#   2. Difficulty
+#
+# Topic is NOT selected for battles.
+# The system automatically picks random questions
+# from all available topics for that skill + difficulty.
 # ============================================================
 
 class BattleGenerateRequest(BaseModel):
 
     skill_id: int
-
-    topic: str | None = None
 
     difficulty: str = "BEGINNER"
 
@@ -39,8 +45,6 @@ class BattleGenerateResponse(BaseModel):
     skill_id: int
 
     skill_name: str
-
-    topic: str | None
 
     difficulty: str
 

@@ -26,27 +26,39 @@ router = APIRouter(
 
 # ============================================================
 # GET PRACTICE TOPICS
+#
+# Flow:
+# Skill -> Difficulty -> Available Topics
 # ============================================================
 
-@router.get(
-    "/topics",
-)
+@router.get("/topics")
 def get_practice_topics(
     skill_id: int,
+    difficulty: str,
     db: Session = Depends(get_db),
     _: User = Depends(require_student),
 ):
-    topics = db.scalars(
-        select(
-            Question.topic
+    difficulty = difficulty.strip().upper()
+    allowed_difficulties = {
+        "EASY",
+        "MEDIUM",
+        "HARD",
+    }
+
+    if difficulty not in allowed_difficulties:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid difficulty.",
         )
+
+    topics = db.scalars(
+        select(Question.topic)
         .where(
             Question.skill_id == skill_id,
+            Question.difficulty == difficulty,
             Question.is_active.is_(True),
             Question.topic.is_not(None),
-            func.trim(
-                Question.topic
-            ) != "",
+            func.trim(Question.topic) != "",
         )
         .distinct()
         .order_by(
@@ -59,6 +71,8 @@ def get_practice_topics(
 
 # ============================================================
 # GET PRACTICE QUESTIONS
+#
+# Skill + Difficulty + Topic
 # ============================================================
 
 @router.get(
@@ -91,24 +105,45 @@ def get_practice_questions(
         )
     )
 
+    # --------------------------------------------------------
+    # SKILL
+    # --------------------------------------------------------
+
     if skill_id is not None:
         query = query.where(
             Question.skill_id == skill_id
         )
 
-    if topic:
-        query = query.where(
-            func.lower(
-                Question.topic
-            )
-            == topic.strip().lower()
-        )
+    # --------------------------------------------------------
+    # DIFFICULTY
+    # --------------------------------------------------------
 
     if difficulty:
+        difficulty = difficulty.strip().upper()
+
         query = query.where(
-            Question.difficulty
-            == difficulty.upper()
+            Question.difficulty == difficulty
         )
+
+    # --------------------------------------------------------
+    # TOPIC
+    # --------------------------------------------------------
+
+    if topic:
+        topic = topic.strip()
+
+        query = query.where(
+            func.lower(
+                func.trim(
+                    Question.topic
+                )
+            )
+            == topic.lower()
+        )
+
+    # --------------------------------------------------------
+    # RANDOM QUESTIONS
+    # --------------------------------------------------------
 
     questions = db.scalars(
         query
@@ -117,6 +152,10 @@ def get_practice_questions(
         )
         .limit(limit)
     ).all()
+
+    # --------------------------------------------------------
+    # RESPONSE
+    # --------------------------------------------------------
 
     return [
         {
@@ -169,8 +208,7 @@ def check_practice_answer(
         select(Option)
         .where(
             Option.id == data.option_id,
-            Option.question_id
-            == data.question_id,
+            Option.question_id == data.question_id,
         )
     )
 
@@ -183,8 +221,7 @@ def check_practice_answer(
     correct_option = db.scalar(
         select(Option)
         .where(
-            Option.question_id
-            == data.question_id,
+            Option.question_id == data.question_id,
             Option.is_correct.is_(True),
         )
     )
