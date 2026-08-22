@@ -117,7 +117,7 @@ The Question Bank supports CSV-based question importing.
 
 ## Folder Structure
 
-
+```text
 SkillArena/
 │
 ├── frontend/
@@ -146,7 +146,7 @@ SkillArena/
     ├── alembic/
     └── requirements.txt
 
-
+```
 ### Industrial Use
 
 SkillArena can be used as a programming practice and assessment platform for:
