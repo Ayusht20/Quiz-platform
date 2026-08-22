@@ -1,546 +1,592 @@
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-
+import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
-  Loader2,
-  Swords,
-  Target,
+  ArrowUpRight,
+  Flame,
   Trophy,
   Zap,
+  Swords,
   ChevronRight,
+  LockKeyhole,
+  Target,
+  CheckCircle2,
+  Star,
 } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 
-import { useNavigate } from "react-router-dom";
+import Sidebar from "../../components/Sidebar";
+import ThemeToggle from "../../components/ThemeToggle";
+import { useAuth } from "../../context/AuthContext";
 
-import {
-  getAvailableSkills,
-} from "../../services/skillService";
+import { getMyQuests } from "../../services/questService";
+import { getMySkillProgress } from "../../services/skillService";
 
-import {
-  generateBattle,
-} from "../../services/battleService";
+// ============================================================
+// FALLBACK COLORS
+// ============================================================
 
+const skillColors = [
+  "var(--primary)",
+  "var(--violet)",
+  "var(--cyan)",
+  "var(--orange)",
+];
 
-export default function BattleSetup() {
+// ============================================================
+// STATIC DEMO DATA
+// ============================================================
 
+const battles = [
+  {
+    title: "JavaScript Arrays",
+    category: "JavaScript",
+    score: "86%",
+    xp: "+120",
+  },
+  {
+    title: "Python Fundamentals",
+    category: "Python",
+    score: "78%",
+    xp: "+100",
+  },
+  {
+    title: "React Components",
+    category: "React",
+    score: "72%",
+    xp: "+80",
+  },
+];
+
+const leaderboard = [
+  {
+    rank: 124,
+    name: "Rahul",
+    xp: 5210,
+  },
+  {
+    rank: 125,
+    name: "Priya",
+    xp: 4890,
+  },
+];
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+
+export default function Dashboard() {
+  const { user } = useAuth();
   const navigate = useNavigate();
 
-  const [skills, setSkills] =
-    useState([]);
+  // ==========================================================
+  // STATE
+  // ==========================================================
 
-  const [selectedSkill, setSelectedSkill] =
-    useState(null);
+  const [skillProgress, setSkillProgress] = useState([]);
+  const [quests, setQuests] = useState([]);
 
-  const [difficulty, setDifficulty] =
-    useState("");
+  const [loadingSkills, setLoadingSkills] = useState(true);
+  const [loadingQuests, setLoadingQuests] = useState(true);
 
-  const [loadingSkills, setLoadingSkills] =
-    useState(true);
+  // ==========================================================
+  // USER
+  // ==========================================================
 
-  const [starting, setStarting] =
-    useState(false);
+  const xp = user?.xp ?? 0;
+  const level = user?.level ?? 1;
 
-  const [error, setError] =
-    useState("");
+  const firstName =
+    user?.name?.split(" ")[0] || "Player";
 
+  // ==========================================================
+  // XP PROGRESS
+  // ==========================================================
 
-  // ============================================================
-  // LOAD SKILLS
-  // ============================================================
+  const xpIntoLevel = xp % 1000;
+
+  const xpProgress = Math.min(
+    (xpIntoLevel / 1000) * 100,
+    100
+  );
+
+  // ==========================================================
+  // LOAD SKILL PROGRESS
+  // ==========================================================
 
   useEffect(() => {
+    let cancelled = false;
 
     const loadSkills = async () => {
-
       try {
-
         setLoadingSkills(true);
 
-        const data =
-          await getAvailableSkills();
+        const data = await getMySkillProgress();
 
-        setSkills(data || []);
-
-      } catch (err) {
-
+        if (!cancelled) {
+          setSkillProgress(
+            Array.isArray(data)
+              ? data
+              : []
+          );
+        }
+      } catch (error) {
         console.error(
-          "Failed to load skills:",
-          err
+          "Failed to load skill progress:",
+          error
         );
 
-        setError(
-          "Unable to load skills."
-        );
-
+        if (!cancelled) {
+          setSkillProgress([]);
+        }
       } finally {
-
-        setLoadingSkills(false);
-
+        if (!cancelled) {
+          setLoadingSkills(false);
+        }
       }
     };
 
     loadSkills();
 
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
+  // ==========================================================
+  // LOAD QUESTS
+  // ==========================================================
 
-  // ============================================================
-  // START BATTLE
-  // ============================================================
+  useEffect(() => {
+    let cancelled = false;
 
-  const handleStartBattle = async () => {
+    const loadQuests = async () => {
+      try {
+        setLoadingQuests(true);
 
-    if (
-      !selectedSkill ||
-      !difficulty
-    ) {
+        const data = await getMyQuests();
 
-      setError(
-        "Please select a skill and difficulty."
-      );
+        if (!cancelled) {
+          setQuests(
+            Array.isArray(data)
+              ? data
+              : []
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load quests:",
+          error
+        );
 
-      return;
+        if (!cancelled) {
+          setQuests([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingQuests(false);
+        }
+      }
+    };
 
-    }
+    loadQuests();
 
-    try {
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-      setStarting(true);
-      setError("");
+  // ==========================================================
+  // NORMALIZE SKILL DATA
+  // ==========================================================
 
-      const battle =
-        await generateBattle({
-          skillId:
-            selectedSkill.id,
+  const skills = useMemo(() => {
+    return skillProgress
+      .slice(0, 4)
+      .map((skill, index) => {
+        const name =
+          skill.skill_name ||
+          skill.name ||
+          skill.skill?.name ||
+          `Skill ${index + 1}`;
 
-          difficulty,
+        const answered =
+          skill.questions_answered ?? 0;
 
-          /*
-           * IMPORTANT:
-           * No topic is sent.
-           */
+        const correct =
+          skill.questions_correct ?? 0;
 
-          questionCount: 10,
+        const progress =
+          skill.progress ??
+          skill.percentage ??
+          (
+            answered > 0
+              ? Math.round(
+                  (correct / answered) * 100
+                )
+              : 0
+          );
 
-          durationMinutes: 10,
-        });
+        const completed =
+          skill.completed ?? false;
 
-      navigate(
-        `/practice/${battle.assessment_id}`
-      );
+        const mastered =
+          skill.mastered ?? false;
 
-    } catch (err) {
+        return {
+          id:
+            skill.skill_id ??
+            skill.skill?.id ??
+            index,
 
-      console.error(
-        "Failed to generate battle:",
-        err
-      );
+          name,
 
-      setError(
-        err.response?.data?.detail ||
-        "Unable to generate battle."
-      );
+          short: name
+            .split(" ")
+            .map((word) => word[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase(),
 
-    } finally {
+          progress: Math.min(
+            Math.max(progress, 0),
+            100
+          ),
 
-      setStarting(false);
+          completed,
+          mastered,
 
-    }
-  };
+          unlocked:
+            completed ||
+            answered > 0 ||
+            progress > 0,
 
+          color:
+            skillColors[
+              index % skillColors.length
+            ],
+        };
+      });
+  }, [skillProgress]);
+
+  // ==========================================================
+  // QUEST SUMMARY
+  // ==========================================================
+
+  const activeQuests = useMemo(() => {
+    return quests.filter(
+      (quest) =>
+        !quest.completed &&
+        !quest.reward_claimed
+    );
+  }, [quests]);
+
+  const featuredQuest =
+    activeQuests[0] ||
+    quests[0] ||
+    null;
+
+  // ==========================================================
+  // QUEST PROGRESS %
+  // ==========================================================
+
+  const questProgress = featuredQuest
+    ? Math.min(
+        (
+          featuredQuest.progress /
+          Math.max(
+            featuredQuest.target_value,
+            1
+          )
+        ) * 100,
+        100
+      )
+    : 0;
+
+  // ==========================================================
+  // RENDER
+  // ==========================================================
 
   return (
+    <div className="arena-background min-h-screen bg-[var(--bg)] text-[var(--text)]">
 
-    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
+      <Sidebar />
 
-      <main className="mx-auto max-w-6xl px-5 py-8 lg:px-8 lg:py-12">
+      {/* ====================================================== */}
+      {/* MOBILE HEADER */}
+      {/* ====================================================== */}
 
-        {/* ================================================== */}
-        {/* HEADER */}
-        {/* ================================================== */}
+      <div className="flex h-16 items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-5 lg:hidden">
 
-        <button
-          onClick={() =>
-            navigate("/practice")
-          }
-          className="flex items-center gap-2 text-xs font-bold text-[var(--muted)] hover:text-[var(--text)]"
-        >
+        <div className="flex items-center gap-2">
 
-          <ArrowLeft size={16} />
-
-          Practice Arena
-
-        </button>
-
-
-        <section className="mt-10">
-
-          <div className="flex items-center gap-3">
-
-            <div className="flex h-11 w-11 items-center justify-center bg-[var(--primary)] text-white">
-
-              <Swords size={20} />
-
-            </div>
-
-            <div>
-
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-[var(--primary)]">
-                Battle Arena
-              </p>
-
-              <h1 className="mt-1 text-3xl font-black">
-                Enter the Battle
-              </h1>
-
-            </div>
-
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--primary)] text-white">
+            <Zap
+              size={16}
+              fill="currentColor"
+            />
           </div>
 
+          <span className="text-sm font-black">
+            SKILL
+            <span className="text-[var(--primary)]">
+              ARENA
+            </span>
+          </span>
 
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-[var(--muted)]">
-            Choose your skill and difficulty.
-            SkillArena will randomly select questions
-            from every available topic at that level.
-          </p>
+        </div>
 
-        </section>
+        <ThemeToggle />
 
+      </div>
 
-        {/* ================================================== */}
-        {/* ERROR */}
-        {/* ================================================== */}
+      {/* ====================================================== */}
+      {/* MAIN */}
+      {/* ====================================================== */}
 
-        {error && (
+      <main className="lg:ml-[245px]">
 
-          <div className="mt-7 border border-[var(--danger)]/30 bg-[var(--danger)]/10 p-4 text-sm text-[var(--danger)]">
-            {error}
-          </div>
+        {/* ==================================================== */}
+        {/* TOP HUD */}
+        {/* ==================================================== */}
 
-        )}
+        <header className="hidden h-[76px] items-center justify-between border-b border-[var(--border)] bg-[var(--surface)]/80 px-10 backdrop-blur-md lg:flex">
 
-
-        {/* ================================================== */}
-        {/* STEP 01 — SKILL */}
-        {/* ================================================== */}
-
-        <section className="mt-10">
-
-          <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
-            Step 01
-          </p>
-
-          <h2 className="mt-1 text-xl font-black">
-            Choose Your Skill
-          </h2>
-
-
-          {loadingSkills ? (
-
-            <div className="mt-6 border border-[var(--border)] bg-[var(--surface)] p-8 text-center text-sm text-[var(--muted)]">
-              Loading skills...
-            </div>
-
-          ) : (
-
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-
-              {skills.map(
-                (skill) => {
-
-                  const active =
-                    selectedSkill?.id ===
-                    skill.id;
-
-                  return (
-
-                    <button
-                      key={skill.id}
-                      onClick={() => {
-
-                        setSelectedSkill(
-                          skill
-                        );
-
-                        setDifficulty(
-                          ""
-                        );
-
-                        setError("");
-
-                      }}
-                      className={`border p-5 text-left transition ${
-                        active
-                          ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-                          : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/50"
-                      }`}
-                    >
-
-                      <div className="flex items-center justify-between">
-
-                        <div className="flex h-10 w-10 items-center justify-center bg-[var(--surface-soft)] text-[var(--primary)]">
-
-                          <Swords
-                            size={18}
-                          />
-
-                        </div>
-
-
-                        {active && (
-
-                          <span className="h-2.5 w-2.5 rounded-full bg-[var(--primary)]" />
-
-                        )}
-
-                      </div>
-
-
-                      <h3 className="mt-5 text-sm font-black">
-                        {skill.name}
-                      </h3>
-
-
-                      <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                        {skill.description ||
-                          "Test your knowledge in this skill."}
-                      </p>
-
-                    </button>
-
-                  );
-
-                }
-              )}
-
-            </div>
-
-          )}
-
-        </section>
-
-
-        {/* ================================================== */}
-        {/* STEP 02 — DIFFICULTY */}
-        {/* ================================================== */}
-
-        {selectedSkill && (
-
-          <motion.section
-            initial={{
-              opacity: 0,
-              y: 15,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            className="mt-12"
-          >
+          <div>
 
             <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
-              Step 02
+              Player Hub
             </p>
 
-            <h2 className="mt-1 text-xl font-black">
-              Choose Battle Level
-            </h2>
-
-
-            <p className="mt-2 text-sm text-[var(--muted)]">
-              Questions will be randomly selected
-              from all topics at this level.
+            <p className="mt-1 text-sm font-bold">
+              Welcome back, {firstName}
             </p>
 
+          </div>
 
-            <div className="mt-6 grid max-w-3xl gap-4 sm:grid-cols-3">
+          <div className="flex items-center gap-7">
 
-              {[
-                {
-                  value: "EASY",
-                  label: "Easy",
-                  description:
-                    "Test your fundamentals.",
-                },
-                {
-                  value: "INTERMEDIATE",
-                  label: "Intermediate",
-                  description:
-                    "Challenge your knowledge.",
-                },
-                {
-                  value: "HARD",
-                  label: "Hard",
-                  description:
-                    "Push your limits.",
-                },
-              ].map(
-                (item) => {
+            {/* STREAK */}
 
-                  const active =
-                    difficulty ===
-                    item.value;
+            <div className="flex items-center gap-2">
 
-                  return (
+              <Flame
+                size={18}
+                className="text-[var(--orange)]"
+                fill="currentColor"
+              />
 
-                    <button
-                      key={item.value}
-                      onClick={() =>
-                        setDifficulty(
-                          item.value
-                        )
-                      }
-                      className={`border p-6 text-left transition ${
-                        active
-                          ? "border-[var(--primary)] bg-[var(--primary-soft)]"
-                          : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/50"
-                      }`}
-                    >
+              <div>
 
-                      <div className="flex items-center justify-between">
+                <p className="text-xs font-black">
+                  7
+                </p>
 
-                        <div className="flex items-center gap-2">
+                <p className="text-[8px] uppercase tracking-wider text-[var(--muted)]">
+                  Streak
+                </p>
 
-                          <Zap
-                            size={17}
-                            className={
-                              active
-                                ? "text-[var(--primary)]"
-                                : "text-[var(--muted)]"
-                            }
-                          />
-
-                          <span
-                            className={`text-sm font-black ${
-                              active
-                                ? "text-[var(--primary)]"
-                                : ""
-                            }`}
-                          >
-                            {item.label}
-                          </span>
-
-                        </div>
-
-
-                        {active && (
-
-                          <span className="h-2 w-2 rounded-full bg-[var(--primary)]" />
-
-                        )}
-
-                      </div>
-
-
-                      <p className="mt-3 text-[10px] leading-5 text-[var(--muted)]">
-                        {item.description}
-                      </p>
-
-                    </button>
-
-                  );
-
-                }
-              )}
+              </div>
 
             </div>
 
-          </motion.section>
+            {/* XP */}
 
-        )}
+            <div className="flex items-center gap-2">
 
+              <Zap
+                size={17}
+                className="text-[var(--cyan)]"
+                fill="currentColor"
+              />
 
-        {/* ================================================== */}
-        {/* BATTLE SUMMARY */}
-        {/* ================================================== */}
+              <div>
 
-        {selectedSkill &&
-          difficulty && (
+                <p className="text-xs font-black">
+                  {xp.toLocaleString()}
+                </p>
+
+                <p className="text-[8px] uppercase tracking-wider text-[var(--muted)]">
+                  XP
+                </p>
+
+              </div>
+
+            </div>
+
+            {/* RANK */}
+
+            <div className="flex items-center gap-2">
+
+              <Trophy
+                size={17}
+                className="text-[var(--gold)]"
+              />
+
+              <div>
+
+                <p className="text-xs font-black">
+                  —
+                </p>
+
+                <p className="text-[8px] uppercase tracking-wider text-[var(--muted)]">
+                  Rank
+                </p>
+
+              </div>
+
+            </div>
+
+            <div className="h-7 w-px bg-[var(--border)]" />
+
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-black text-[var(--primary)]">
+              {user?.name
+                ?.charAt(0)
+                ?.toUpperCase() || "U"}
+            </div>
+
+          </div>
+
+        </header>
+
+        {/* ==================================================== */}
+        {/* PAGE */}
+        {/* ==================================================== */}
+
+        <div className="mx-auto max-w-[1500px] px-5 py-8 sm:px-7 lg:px-10 lg:py-10">
+
+          {/* ================================================== */}
+          {/* HERO */}
+          {/* ================================================== */}
 
           <motion.section
             initial={{
               opacity: 0,
-              y: 15,
+              y: 20,
             }}
             animate={{
               opacity: 1,
               y: 0,
             }}
-            className="mt-10"
+            transition={{
+              duration: 0.5,
+            }}
+            className="mb-8"
           >
 
-            <div className="border border-[var(--primary)]/30 bg-[var(--primary-soft)] p-6">
+            <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
 
-              <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+              <div>
 
-                <div>
+                <p className="mb-2 text-[10px] font-black uppercase tracking-[0.28em] text-[var(--primary)]">
+                  Player Hub
+                </p>
 
-                  <div className="flex items-center gap-2">
+                <h1 className="text-4xl font-black tracking-[-0.04em] sm:text-5xl">
+                  Ready for battle?
+                </h1>
 
-                    <Swords
-                      size={18}
-                      className="text-[var(--primary)]"
+                <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--muted)]">
+                  Sharpen your skills, defeat challenges
+                  and climb the global ranks.
+                </p>
+
+              </div>
+
+              {/* LEVEL HUD */}
+
+              <div className="flex items-center gap-4">
+
+                <div className="relative flex h-[92px] w-[92px] items-center justify-center">
+
+                  <svg
+                    className="absolute inset-0 -rotate-90"
+                    viewBox="0 0 100 100"
+                  >
+
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="43"
+                      fill="none"
+                      stroke="var(--surface-soft)"
+                      strokeWidth="5"
                     />
 
-                    <span className="text-xs font-black uppercase tracking-[0.15em] text-[var(--primary)]">
-                      Battle Ready
-                    </span>
+                    <motion.circle
+                      cx="50"
+                      cy="50"
+                      r="43"
+                      fill="none"
+                      stroke="var(--violet)"
+                      strokeWidth="5"
+                      strokeLinecap="round"
+                      strokeDasharray="270"
+                      initial={{
+                        strokeDashoffset: 270,
+                      }}
+                      animate={{
+                        strokeDashoffset:
+                          270 -
+                          (270 * xpProgress) /
+                            100,
+                      }}
+                      transition={{
+                        duration: 1.2,
+                        ease: "easeOut",
+                      }}
+                    />
+
+                  </svg>
+
+                  <div className="text-center">
+
+                    <p className="text-2xl font-black">
+                      {String(level).padStart(
+                        2,
+                        "0"
+                      )}
+                    </p>
+
+                    <p className="text-[7px] font-black uppercase tracking-wider text-[var(--muted)]">
+                      Level
+                    </p>
 
                   </div>
 
-
-                  <h2 className="mt-2 text-xl font-black">
-                    {selectedSkill.name} •{" "}
-                    {difficulty}
-                  </h2>
-
-
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                    10 random questions will be
-                    selected from all available topics
-                    for this skill and difficulty.
-                  </p>
-
                 </div>
 
+                <div>
 
-                <button
-                  onClick={
-                    handleStartBattle
-                  }
-                  disabled={starting}
-                  className="flex shrink-0 items-center justify-center gap-2 bg-[var(--primary)] px-7 py-4 text-xs font-black uppercase tracking-wider text-white transition hover:brightness-110 disabled:opacity-50"
-                >
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                    Next Level
+                  </p>
 
-                  {starting ? (
+                  <p className="mt-1 text-lg font-black">
+                    {xpIntoLevel}
+                    <span className="text-sm font-medium text-[var(--muted)]">
+                      {" "}
+                      / 1000 XP
+                    </span>
+                  </p>
 
-                    <>
-                      <Loader2
-                        size={16}
-                        className="animate-spin"
-                      />
+                  <div className="mt-2 h-1.5 w-36 overflow-hidden rounded-full bg-[var(--surface-soft)]">
 
-                      Creating Battle...
+                    <motion.div
+                      initial={{
+                        width: 0,
+                      }}
+                      animate={{
+                        width: `${xpProgress}%`,
+                      }}
+                      transition={{
+                        duration: 1,
+                      }}
+                      className="h-full bg-[var(--violet)]"
+                    />
 
-                    </>
+                  </div>
 
-                  ) : (
-
-                    <>
-                      <Swords size={16} />
-
-                      Start Battle
-
-                      <ChevronRight
-                        size={16}
-                      />
-
-                    </>
-
-                  )}
-
-                </button>
+                </div>
 
               </div>
 
@@ -548,73 +594,825 @@ export default function BattleSetup() {
 
           </motion.section>
 
-        )}
+          {/* ================================================== */}
+          {/* DAILY BATTLE */}
+          {/* ================================================== */}
 
+          <motion.section
+            initial={{
+              opacity: 0,
+              y: 25,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            transition={{
+              delay: 0.1,
+              duration: 0.5,
+            }}
+            className="relative overflow-hidden border border-[var(--border)] bg-[var(--surface)]"
+          >
 
-        {/* ================================================== */}
-        {/* INFO */}
-        {/* ================================================== */}
+            <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-[var(--primary)]/10 blur-3xl" />
 
-        <section className="mt-8 grid gap-3 sm:grid-cols-3">
+            <div className="relative grid lg:grid-cols-[1fr_330px]">
 
-          <div className="bg-[var(--surface)] p-5">
+              <div className="p-7 sm:p-10">
 
-            <Swords
-              size={18}
-              className="text-[var(--primary)]"
-            />
+                <div className="flex items-center gap-3">
 
-            <p className="mt-3 text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
-              Questions
-            </p>
+                  <div className="flex h-9 w-9 items-center justify-center bg-[var(--primary-soft)] text-[var(--primary)]">
+                    <Swords size={18} />
+                  </div>
 
-            <p className="mt-1 text-sm font-black">
-              10 Random
-            </p>
+                  <div>
 
-          </div>
+                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--primary)]">
+                      Battle Arena
+                    </p>
 
+                    <p className="text-[9px] uppercase tracking-wider text-[var(--muted)]">
+                      Choose your next challenge
+                    </p>
 
-          <div className="bg-[var(--surface)] p-5">
+                  </div>
 
-            <Target
-              size={18}
-              className="text-[var(--primary)]"
-            />
+                </div>
 
-            <p className="mt-3 text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
-              Time
-            </p>
+                <h2 className="mt-8 max-w-2xl text-3xl font-black tracking-tight sm:text-4xl">
+                  Ready to test your
+                  <span className="text-[var(--primary)]">
+                    {" "}skills?
+                  </span>
+                </h2>
 
-            <p className="mt-1 text-sm font-black">
-              10 Minutes
-            </p>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--muted)]">
+                  Enter the arena, complete battles,
+                  earn XP and progress through your
+                  skill tree.
+                </p>
 
-          </div>
+                <button
+                  onClick={() =>
+                    navigate("/practice")
+                  }
+                  className="mt-8 flex items-center gap-3 bg-[var(--primary)] px-6 py-3.5 text-xs font-black uppercase tracking-wide text-white shadow-lg shadow-blue-500/20"
+                >
+                  Enter Arena
+                  <ArrowUpRight size={16} />
+                </button>
 
+              </div>
 
-          <div className="bg-[var(--surface)] p-5">
+              <div className="border-t border-[var(--border)] bg-[var(--surface-soft)]/50 p-7 lg:border-l lg:border-t-0">
 
-            <Trophy
-              size={18}
-              className="text-[var(--primary)]"
-            />
+                <div className="mb-5 flex items-center justify-between">
 
-            <p className="mt-3 text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
-              Rewards
-            </p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                    Progress Intel
+                  </p>
 
-            <p className="mt-1 text-sm font-black">
-              XP + Badges
-            </p>
+                  <span className="h-2 w-2 rounded-full bg-[var(--success)] shadow-[0_0_12px_var(--success)]" />
 
-          </div>
+                </div>
 
-        </section>
+                <div className="space-y-5">
+
+                  <div>
+
+                    <p className="text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
+                      Active Quests
+                    </p>
+
+                    <p className="mt-2 text-2xl font-black">
+                      {loadingQuests
+                        ? "..."
+                        : activeQuests.length}
+                    </p>
+
+                  </div>
+
+                  <div className="border-t border-[var(--border)] pt-4">
+
+                    <p className="text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
+                      Skills Tracked
+                    </p>
+
+                    <p className="mt-2 text-2xl font-black">
+                      {loadingSkills
+                        ? "..."
+                        : skillProgress.length}
+                    </p>
+
+                  </div>
+
+                  <div className="border-t border-[var(--border)] pt-4">
+
+                    <p className="text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
+                      Current Level
+                    </p>
+
+                    <p className="mt-2 text-2xl font-black">
+                      {level}
+                    </p>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </motion.section>
+
+          {/* ================================================== */}
+          {/* STATS */}
+          {/* ================================================== */}
+
+          <section className="mt-5 grid grid-cols-2 border-y border-[var(--border)] sm:grid-cols-4">
+
+            {[
+              {
+                label: "XP",
+                value: xp.toLocaleString(),
+                icon: Zap,
+                color: "var(--cyan)",
+              },
+              {
+                label: "Level",
+                value: level,
+                icon: Star,
+                color: "var(--violet)",
+              },
+              {
+                label: "Active Quests",
+                value: loadingQuests
+                  ? "..."
+                  : activeQuests.length,
+                icon: Target,
+                color: "var(--primary)",
+              },
+              {
+                label: "Skills",
+                value: loadingSkills
+                  ? "..."
+                  : skillProgress.length,
+                icon: Trophy,
+                color: "var(--gold)",
+              },
+            ].map((stat, index) => {
+
+              const Icon = stat.icon;
+
+              return (
+                <motion.div
+                  key={stat.label}
+                  whileHover={{
+                    backgroundColor:
+                      "var(--surface-soft)",
+                  }}
+                  className={`flex items-center gap-3 px-5 py-5 ${
+                    index !== 3
+                      ? "border-r border-[var(--border)]"
+                      : ""
+                  }`}
+                >
+
+                  <Icon
+                    size={18}
+                    style={{
+                      color: stat.color,
+                    }}
+                  />
+
+                  <div>
+
+                    <p className="text-sm font-black">
+                      {stat.value}
+                    </p>
+
+                    <p className="text-[8px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                      {stat.label}
+                    </p>
+
+                  </div>
+
+                </motion.div>
+              );
+            })}
+
+          </section>
+
+          {/* ================================================== */}
+          {/* SKILL TREE */}
+          {/* ================================================== */}
+
+          <section className="mt-12">
+
+            <div className="mb-6 flex items-end justify-between">
+
+              <div>
+
+                <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
+                  Progression
+                </p>
+
+                <Link
+                  to="/skills"
+                  className="text-xl font-black transition hover:text-[var(--primary)]"
+                >
+                  Skill Tree
+                </Link>
+
+              </div>
+
+              <button
+                onClick={() =>
+                  navigate("/skills")
+                }
+                className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-[var(--primary)]"
+              >
+                Open Tree
+                <ChevronRight size={14} />
+              </button>
+
+            </div>
+
+            <div className="relative overflow-hidden border border-[var(--border)] bg-[var(--surface)] p-7 sm:p-10">
+
+              {loadingSkills ? (
+
+                <div className="py-12 text-center text-sm font-bold text-[var(--muted)]">
+                  Loading skill progress...
+                </div>
+
+              ) : skills.length === 0 ? (
+
+                <div className="py-12 text-center">
+
+                  <LockKeyhole
+                    size={30}
+                    className="mx-auto text-[var(--muted)]"
+                  />
+
+                  <p className="mt-4 text-sm font-black">
+                    No skill progress yet
+                  </p>
+
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Complete a battle to start
+                    building your skill tree.
+                  </p>
+
+                </div>
+
+              ) : (
+
+                <>
+
+                  <div className="absolute left-[15%] right-[15%] top-1/2 hidden h-px bg-gradient-to-r from-[var(--primary)] via-[var(--violet)] to-[var(--cyan)] opacity-30 md:block" />
+
+                  <div className="relative grid grid-cols-2 gap-10 md:grid-cols-4">
+
+                    {skills.map(
+                      (skill, index) => (
+
+                        <motion.div
+                          key={skill.id}
+                          initial={{
+                            opacity: 0,
+                            scale: 0.8,
+                          }}
+                          whileInView={{
+                            opacity: 1,
+                            scale: 1,
+                          }}
+                          viewport={{
+                            once: true,
+                          }}
+                          transition={{
+                            delay:
+                              index * 0.1,
+                          }}
+                          className="relative flex flex-col items-center text-center"
+                        >
+
+                          <motion.div
+                            whileHover={{
+                              scale: 1.08,
+                            }}
+                            className="relative flex h-20 w-20 items-center justify-center border-2 bg-[var(--surface)]"
+                            style={{
+                              borderColor:
+                                skill.unlocked
+                                  ? skill.color
+                                  : "var(--border)",
+                            }}
+                          >
+
+                            <div
+                              className="absolute inset-1 opacity-10"
+                              style={{
+                                background:
+                                  skill.color,
+                              }}
+                            />
+
+                            {skill.unlocked ? (
+
+                              <span
+                                className="relative text-lg font-black"
+                                style={{
+                                  color:
+                                    skill.color,
+                                }}
+                              >
+                                {skill.short}
+                              </span>
+
+                            ) : (
+
+                              <LockKeyhole
+                                size={20}
+                                className="relative text-[var(--muted)]"
+                              />
+
+                            )}
+
+                          </motion.div>
+
+                          <p className="mt-4 text-sm font-black">
+                            {skill.name}
+                          </p>
+
+                          <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-[var(--muted)]">
+
+                            {skill.mastered ? (
+                              <span className="text-[var(--success)]">
+                                Mastered
+                              </span>
+                            ) : skill.completed ? (
+                              `${skill.progress}% progress`
+                            ) : (
+                              `${skill.progress}%`
+                            )}
+
+                          </p>
+
+                          <div className="mt-2 h-1 w-20 overflow-hidden rounded-full bg-[var(--surface-soft)]">
+
+                            <div
+                              className="h-full"
+                              style={{
+                                width: `${skill.progress}%`,
+                                background:
+                                  skill.color,
+                              }}
+                            />
+
+                          </div>
+
+                        </motion.div>
+
+                      )
+                    )}
+
+                  </div>
+
+                </>
+
+              )}
+
+            </div>
+
+          </section>
+
+          {/* ================================================== */}
+          {/* QUESTS */}
+          {/* ================================================== */}
+
+          <section className="mt-12">
+
+            <div className="mb-6 flex items-end justify-between">
+
+              <div>
+
+                <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
+                  Daily Progress
+                </p>
+
+                <h2 className="mt-1 text-xl font-black">
+                  Quests
+                </h2>
+
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  Complete challenges to earn bonus XP.
+                </p>
+
+              </div>
+
+              <Link
+                to="/quests"
+                className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-[var(--primary)]"
+              >
+                View Quests
+                <ChevronRight size={14} />
+              </Link>
+
+            </div>
+
+            {loadingQuests ? (
+
+              <div className="border border-[var(--border)] bg-[var(--surface)] p-10 text-center text-sm font-bold text-[var(--muted)]">
+                Loading quests...
+              </div>
+
+            ) : !featuredQuest ? (
+
+              <div className="border border-[var(--border)] bg-[var(--surface)] p-10 text-center">
+
+                <Target
+                  size={30}
+                  className="mx-auto text-[var(--muted)]"
+                />
+
+                <p className="mt-4 text-sm font-black">
+                  No active quests
+                </p>
+
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  New challenges will appear here.
+                </p>
+
+              </div>
+
+            ) : (
+
+              <motion.div
+                whileHover={{
+                  y: -3,
+                }}
+                className="relative overflow-hidden border border-[var(--border)] bg-[var(--surface)] p-7"
+              >
+
+                <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[var(--primary)]/10 blur-3xl" />
+
+                <div className="relative flex flex-col justify-between gap-6 md:flex-row md:items-center">
+
+                  <div className="flex items-start gap-4">
+
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-[var(--primary-soft)] text-[var(--primary)]">
+
+                      {featuredQuest.completed ? (
+                        <CheckCircle2 size={21} />
+                      ) : (
+                        <Target size={21} />
+                      )}
+
+                    </div>
+
+                    <div>
+
+                      <p className="text-sm font-black">
+                        {featuredQuest.title}
+                      </p>
+
+                      <p className="mt-1 max-w-xl text-xs leading-5 text-[var(--muted)]">
+                        {featuredQuest.description ||
+                          "Complete this quest to earn bonus XP."}
+                      </p>
+
+                      <div className="mt-4 w-full max-w-md">
+
+                        <div className="mb-2 flex items-center justify-between">
+
+                          <span className="text-[9px] font-black uppercase tracking-wider text-[var(--muted)]">
+                            Progress
+                          </span>
+
+                          <span className="text-[10px] font-black">
+                            {featuredQuest.progress}
+                            {" / "}
+                            {featuredQuest.target_value}
+                          </span>
+
+                        </div>
+
+                        <div className="h-2 overflow-hidden bg-[var(--surface-soft)]">
+
+                          <motion.div
+                            initial={{
+                              width: 0,
+                            }}
+                            animate={{
+                              width: `${questProgress}%`,
+                            }}
+                            transition={{
+                              duration: 0.8,
+                            }}
+                            className="h-full bg-[var(--primary)]"
+                          />
+
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  <div className="flex shrink-0 flex-col items-start gap-3 md:items-end">
+
+                    <span className="text-xs font-black text-[var(--cyan)]">
+                      +{featuredQuest.reward_xp} XP
+                    </span>
+
+                    <Link
+                      to="/quests"
+                      className="flex items-center justify-center gap-2 border border-[var(--border)] px-5 py-3 text-[10px] font-black uppercase tracking-wider transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                    >
+                      Open Quests
+                      <ArrowUpRight size={15} />
+                    </Link>
+
+                  </div>
+
+                </div>
+
+              </motion.div>
+
+            )}
+
+          </section>
+
+          {/* ================================================== */}
+          {/* LOWER CONTENT */}
+          {/* ================================================== */}
+
+          <section className="mt-12 grid gap-10 xl:grid-cols-[1.3fr_1fr]">
+
+            {/* RECENT BATTLES */}
+
+            <div>
+
+              <div className="mb-5 flex items-end justify-between">
+
+                <div>
+
+                  <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
+                    Combat Log
+                  </p>
+
+                  <h2 className="mt-1 text-xl font-black">
+                    Recent Battles
+                  </h2>
+
+                </div>
+
+                <button
+                  onClick={() =>
+                    navigate("/practice")
+                  }
+                  className="text-[10px] font-black uppercase tracking-wider text-[var(--primary)]"
+                >
+                  Arena
+                </button>
+
+              </div>
+
+              <div className="border-y border-[var(--border)]">
+
+                {battles.map(
+                  (battle) => (
+
+                    <motion.div
+                      key={battle.title}
+                      whileHover={{
+                        x: 4,
+                      }}
+                      className="flex items-center gap-4 border-b border-[var(--border)] py-5 last:border-0"
+                    >
+
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center bg-[var(--surface-soft)] text-[var(--primary)]">
+                        <Swords size={17} />
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+
+                        <p className="truncate text-sm font-black">
+                          {battle.title}
+                        </p>
+
+                        <p className="mt-1 text-[9px] font-bold uppercase tracking-wider text-[var(--muted)]">
+                          {battle.category}
+                        </p>
+
+                      </div>
+
+                      <div className="text-right">
+
+                        <p className="text-sm font-black text-[var(--success)]">
+                          {battle.score}
+                        </p>
+
+                        <p className="mt-1 text-[9px] font-black text-[var(--cyan)]">
+                          {battle.xp} XP
+                        </p>
+
+                      </div>
+
+                    </motion.div>
+
+                  )
+                )}
+
+              </div>
+
+            </div>
+
+            {/* LEADERBOARD */}
+
+            <div>
+
+              <div className="mb-5 flex items-end justify-between">
+
+                <div>
+
+                  <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
+                    Competition
+                  </p>
+
+                  <h2 className="mt-1 text-xl font-black">
+                    Global Rank
+                  </h2>
+
+                </div>
+
+                <Trophy
+                  size={19}
+                  className="text-[var(--gold)]"
+                />
+
+              </div>
+
+              <div className="border-y border-[var(--border)]">
+
+                {leaderboard.map(
+                  (player) => (
+
+                    <motion.div
+                      key={player.rank}
+                      whileHover={{
+                        x: 4,
+                      }}
+                      className="flex items-center gap-3 border-b border-[var(--border)] px-2 py-4 last:border-0"
+                    >
+
+                      <span className="w-8 text-center text-xs font-black text-[var(--muted)]">
+                        {player.rank}
+                      </span>
+
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--surface-soft)] text-[10px] font-black">
+                        {player.name.charAt(0)}
+                      </div>
+
+                      <div className="flex-1">
+
+                        <p className="text-xs font-black">
+                          {player.name}
+                        </p>
+
+                      </div>
+
+                      <p className="text-xs font-black">
+                        {player.xp.toLocaleString()}
+
+                        <span className="ml-1 text-[8px] text-[var(--muted)]">
+                          XP
+                        </span>
+
+                      </p>
+
+                    </motion.div>
+
+                  )
+                )}
+
+              </div>
+
+              <button
+                onClick={() =>
+                  navigate("/practice")
+                }
+                className="mt-4 flex w-full items-center justify-center gap-2 border border-[var(--border)] py-3 text-[9px] font-black uppercase tracking-wider text-[var(--muted)] transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+              >
+                Continue Learning
+                <ChevronRight size={13} />
+              </button>
+
+            </div>
+
+          </section>
+
+          {/* ================================================== */}
+          {/* ACHIEVEMENTS */}
+          {/* ================================================== */}
+
+          <section className="mt-12 pb-10">
+
+            <div className="mb-5">
+
+              <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[var(--muted)]">
+                Collection
+              </p>
+
+              <h2 className="mt-1 text-xl font-black">
+                Achievements
+              </h2>
+
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+
+              {quests
+                .filter(
+                  (quest) =>
+                    quest.completed
+                )
+                .slice(0, 3)
+                .map((quest) => (
+
+                  <motion.div
+                    key={quest.id}
+                    whileHover={{
+                      y: -3,
+                    }}
+                    className="flex items-center gap-4 border border-[var(--border)] bg-[var(--surface)] p-5"
+                  >
+
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center bg-[var(--surface-soft)] text-xl">
+                      🏆
+                    </div>
+
+                    <div>
+
+                      <p className="text-xs font-black">
+                        {quest.title}
+                      </p>
+
+                      <p className="mt-1 text-[9px] leading-4 text-[var(--muted)]">
+                        Quest completed · +
+                        {quest.reward_xp} XP
+                      </p>
+
+                    </div>
+
+                  </motion.div>
+
+                ))}
+
+              {quests.filter(
+                (quest) =>
+                  quest.completed
+              ).length === 0 && (
+
+                <div className="border border-[var(--border)] bg-[var(--surface)] p-5 md:col-span-3">
+
+                  <div className="flex items-center gap-4">
+
+                    <div className="flex h-12 w-12 items-center justify-center bg-[var(--surface-soft)] text-xl">
+                      🏆
+                    </div>
+
+                    <div>
+
+                      <p className="text-xs font-black">
+                        Your achievements will appear here
+                      </p>
+
+                      <p className="mt-1 text-[9px] leading-4 text-[var(--muted)]">
+                        Complete quests and challenges
+                        to build your collection.
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+              )}
+
+            </div>
+
+          </section>
+
+        </div>
 
       </main>
 
     </div>
-
   );
 }

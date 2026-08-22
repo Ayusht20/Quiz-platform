@@ -43,7 +43,9 @@ import QuestionEditor from "./pages/admin/QuestionEditor";
 
 import AdminQuests from "./pages/admin/Quests";
 import CreateQuest from "./pages/admin/CreateQuest";
-
+import Users from "./pages/admin/Users";
+// import Skills from "./pages/admin/Skills";
+import Analytics from "./pages/admin/Analytics";
 
 function App() {
   return (
@@ -194,7 +196,16 @@ function App() {
                 }
               />
 
+                <Route
+  path="users"
+  element={<Users />}
+/>
 
+
+<Route
+  path="analytics"
+  element={<Analytics />}
+/>
               {/* =============================================== */}
               {/* ADMIN DASHBOARD */}
               {/* =============================================== */}

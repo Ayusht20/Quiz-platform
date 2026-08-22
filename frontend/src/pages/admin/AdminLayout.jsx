@@ -34,11 +34,6 @@ const navigation = [
     icon: Users,
   },
   {
-    label: "Skills",
-    path: "/admin/skills",
-    icon: Brain,
-  },
-  {
     label: "Analytics",
     path: "/admin/analytics",
     icon: BarChart3,
