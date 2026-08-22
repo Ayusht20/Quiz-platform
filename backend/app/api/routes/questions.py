@@ -9,8 +9,8 @@ from fastapi import (
     UploadFile,
     status,
 )
-
-from sqlalchemy import select
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.dependencies import require_admin
@@ -33,49 +33,243 @@ router = APIRouter(
 
 
 # ============================================================
-# GET ALL QUESTIONS
+# PAGINATED QUESTION RESPONSE
 # ============================================================
+
+
+class QuestionListResponse(BaseModel):
+    items: list[QuestionResponse]
+
+    total: int
+
+    easy: int
+    medium: int
+    hard: int
+
+    page: int
+    page_size: int
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+
+# ============================================================
+# GET QUESTIONS
+#
+# OPTIMIZED FOR LARGE QUESTION BANKS
+#
+# - Server-side pagination
+# - Server-side search
+# - Server-side difficulty/topic filtering
+# - Returns TOTAL question count
+# - Returns difficulty statistics
+# - Loads options only for current page
+# - Never downloads the complete question bank
+# ============================================================
+
 
 @router.get(
     "",
-    response_model=list[QuestionResponse],
+    response_model=QuestionListResponse,
 )
 def get_questions(
     skill_id: int | None = None,
     difficulty: str | None = None,
+    topic: str | None = None,
+    search: str | None = None,
+    page: int = 1,
+    page_size: int = 25,
     db: Session = Depends(get_db),
     _: object = Depends(require_admin),
 ):
-    query = (
-        select(Question)
-        .options(
-            selectinload(Question.options)
+
+    # --------------------------------------------------------
+    # SAFE PAGINATION
+    # --------------------------------------------------------
+
+    page = max(page, 1)
+
+    page_size = max(
+        1,
+        min(page_size, 50),
+    )
+
+    offset = (page - 1) * page_size
+
+    # --------------------------------------------------------
+    # BUILD FILTERS
+    # --------------------------------------------------------
+
+    filters = [
+        Question.is_active.is_(True)
+    ]
+
+    # --------------------------------------------------------
+    # SKILL FILTER
+    # --------------------------------------------------------
+
+    if skill_id is not None:
+        filters.append(
+            Question.skill_id == skill_id
+        )
+
+    # --------------------------------------------------------
+    # DIFFICULTY FILTER
+    # --------------------------------------------------------
+
+    if difficulty:
+        difficulty_value = (
+            difficulty.strip().upper()
+        )
+
+        if difficulty_value:
+            filters.append(
+                Question.difficulty
+                == difficulty_value
+            )
+
+    # --------------------------------------------------------
+    # TOPIC FILTER
+    # --------------------------------------------------------
+
+    if topic:
+        topic_value = topic.strip()
+
+        if topic_value:
+            filters.append(
+                Question.topic.ilike(
+                    topic_value
+                )
+            )
+
+    # --------------------------------------------------------
+    # SEARCH
+    # --------------------------------------------------------
+
+    if search:
+        search_value = search.strip()
+
+        if search_value:
+
+            search_pattern = (
+                f"%{search_value}%"
+            )
+
+            filters.append(
+                (
+                    Question.question_text.ilike(
+                        search_pattern
+                    )
+                )
+                |
+                (
+                    Question.topic.ilike(
+                        search_pattern
+                    )
+                )
+            )
+
+    # ========================================================
+    # TOTAL MATCHING QUESTIONS
+    # ========================================================
+
+    total = db.scalar(
+        select(
+            func.count(Question.id)
+        ).where(
+            *filters
+        )
+    ) or 0
+
+    # ========================================================
+    # DIFFICULTY STATISTICS
+    #
+    # These show the total active question bank,
+    # independent of pagination.
+    # ========================================================
+
+    difficulty_counts = db.execute(
+        select(
+            Question.difficulty,
+            func.count(Question.id),
         )
         .where(
             Question.is_active.is_(True)
         )
+        .group_by(
+            Question.difficulty
+        )
+    ).all()
+
+    difficulty_map = {
+        str(difficulty_value).upper(): count
+        for difficulty_value, count
+        in difficulty_counts
+    }
+
+    easy_count = difficulty_map.get(
+        "EASY",
+        0,
+    )
+
+    medium_count = difficulty_map.get(
+        "MEDIUM",
+        0,
+    )
+
+    hard_count = difficulty_map.get(
+        "HARD",
+        0,
+    )
+
+    # ========================================================
+    # FETCH ONLY CURRENT PAGE
+    # ========================================================
+
+    query = (
+        select(Question)
+        .options(
+            selectinload(
+                Question.options
+            )
+        )
+        .where(
+            *filters
+        )
         .order_by(
             Question.id.desc()
         )
+        .offset(offset)
+        .limit(page_size)
     )
 
-    if skill_id is not None:
-        query = query.where(
-            Question.skill_id == skill_id
-        )
+    questions = db.scalars(
+        query
+    ).unique().all()
 
-    if difficulty:
-        query = query.where(
-            Question.difficulty
-            == difficulty.upper()
-        )
+    # ========================================================
+    # RESPONSE
+    # ========================================================
 
-    return db.scalars(query).all()
+    return {
+        "items": questions,
+
+        "total": total,
+
+        "easy": easy_count,
+        "medium": medium_count,
+        "hard": hard_count,
+
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 # ============================================================
 # GET SINGLE QUESTION
 # ============================================================
+
 
 @router.get(
     "/{question_id}",
@@ -86,6 +280,7 @@ def get_question(
     db: Session = Depends(get_db),
     _: object = Depends(require_admin),
 ):
+
     question = db.scalar(
         select(Question)
         .options(
@@ -111,6 +306,7 @@ def get_question(
 # CREATE SINGLE QUESTION
 # ============================================================
 
+
 @router.post(
     "",
     response_model=QuestionResponse,
@@ -121,6 +317,7 @@ def create_question(
     db: Session = Depends(get_db),
     _: object = Depends(require_admin),
 ):
+
     # --------------------------------------------------------
     # FIND SKILL
     # --------------------------------------------------------
@@ -148,7 +345,9 @@ def create_question(
     if correct_count != 1:
         raise HTTPException(
             status_code=400,
-            detail="Exactly one option must be correct",
+            detail=(
+                "Exactly one option must be correct"
+            ),
         )
 
     # --------------------------------------------------------
@@ -172,8 +371,12 @@ def create_question(
 
         question.options.append(
             Option(
-                option_text=option_data.option_text,
-                is_correct=option_data.is_correct,
+                option_text=(
+                    option_data.option_text
+                ),
+                is_correct=(
+                    option_data.is_correct
+                ),
             )
         )
 
@@ -202,6 +405,7 @@ def create_question(
 # - Uses one final commit
 # ============================================================
 
+
 @router.post(
     "/import-csv",
     status_code=status.HTTP_201_CREATED,
@@ -211,6 +415,7 @@ def import_questions_csv(
     db: Session = Depends(get_db),
     _: object = Depends(require_admin),
 ):
+
     # ========================================================
     # VALIDATE FILE
     # ========================================================
@@ -234,6 +439,7 @@ def import_questions_csv(
     # ========================================================
 
     try:
+
         content = file.file.read()
 
         if not content:
@@ -261,6 +467,7 @@ def import_questions_csv(
         raise
 
     except Exception as exc:
+
         raise HTTPException(
             status_code=400,
             detail=(
@@ -272,7 +479,9 @@ def import_questions_csv(
     if not rows:
         raise HTTPException(
             status_code=400,
-            detail="CSV file contains no data rows.",
+            detail=(
+                "CSV file contains no data rows."
+            ),
         )
 
     # ========================================================
@@ -307,29 +516,21 @@ def import_questions_csv(
     )
 
     if missing_headers:
+
         raise HTTPException(
             status_code=400,
             detail=(
                 "Missing CSV columns: "
                 + ", ".join(
-                    sorted(missing_headers)
+                    sorted(
+                        missing_headers
+                    )
                 )
             ),
         )
 
     # ========================================================
     # FIND SKILL COLUMN
-    #
-    # Preferred:
-    #
-    # skill
-    #
-    # Also supports:
-    #
-    # category
-    #
-    # Backward compatible with an unnamed
-    # first column from older CSV files.
     # ========================================================
 
     skill_column = None
@@ -344,12 +545,14 @@ def import_questions_csv(
             "skill",
             "category",
         }:
+
             skill_column = column
+
             break
 
-    # --------------------------------------------------------
+    # ========================================================
     # BACKWARD COMPATIBILITY
-    # --------------------------------------------------------
+    # ========================================================
 
     if skill_column is None:
 
@@ -359,10 +562,13 @@ def import_questions_csv(
                 column is not None
                 and column.strip() == ""
             ):
+
                 skill_column = column
+
                 break
 
     if skill_column is None:
+
         raise HTTPException(
             status_code=400,
             detail=(
@@ -385,10 +591,7 @@ def import_questions_csv(
     }
 
     # ========================================================
-    # LOAD ALL EXISTING QUESTIONS ONCE
-    #
-    # Options are loaded together.
-    # This avoids a database query for every row.
+    # LOAD EXISTING QUESTIONS ONCE
     # ========================================================
 
     existing_questions = db.scalars(
@@ -398,17 +601,10 @@ def import_questions_csv(
                 Question.options
             )
         )
-    ).all()
+    ).unique().all()
 
     # ========================================================
-    # CREATE IN-MEMORY QUESTION MAP
-    #
-    # Key:
-    #
-    #     skill_id + normalized question text
-    #
-    # This lets us detect existing questions
-    # without querying PostgreSQL for every row.
+    # CREATE QUESTION MAP
     # ========================================================
 
     question_map = {
@@ -443,9 +639,9 @@ def import_questions_csv(
 
         try:
 
-            # =================================================
+            # ------------------------------------------------
             # READ VALUES
-            # =================================================
+            # ------------------------------------------------
 
             skill_name = (
                 row.get(skill_column)
@@ -502,9 +698,9 @@ def import_questions_csv(
                 or ""
             ).strip()
 
-            # =================================================
+            # ------------------------------------------------
             # VALIDATION
-            # =================================================
+            # ------------------------------------------------
 
             if not skill_name:
                 raise ValueError(
@@ -526,6 +722,7 @@ def import_questions_csv(
                 "MEDIUM",
                 "HARD",
             }:
+
                 raise ValueError(
                     "Difficulty must be EASY, "
                     "MEDIUM or HARD."
@@ -535,11 +732,13 @@ def import_questions_csv(
                 marks = int(marks_raw)
 
             except ValueError:
+
                 raise ValueError(
                     "Marks must be an integer."
                 )
 
             if marks <= 0:
+
                 raise ValueError(
                     "Marks must be greater than 0."
                 )
@@ -550,8 +749,10 @@ def import_questions_csv(
                 "C",
                 "D",
             }:
+
                 raise ValueError(
-                    "Correct option must be A, B, C or D."
+                    "Correct option must be "
+                    "A, B, C or D."
                 )
 
             options = {
@@ -565,26 +766,29 @@ def import_questions_csv(
                 not value
                 for value in options.values()
             ):
+
                 raise ValueError(
                     "All four options are required."
                 )
 
-            # =================================================
-            # FIND SKILL FROM MEMORY
-            # =================================================
+            # ------------------------------------------------
+            # FIND SKILL
+            # ------------------------------------------------
 
             skill = skill_map.get(
                 skill_name.lower()
             )
 
             if not skill:
+
                 raise ValueError(
-                    f"Skill '{skill_name}' not found."
+                    f"Skill '{skill_name}' "
+                    "not found."
                 )
 
-            # =================================================
+            # ------------------------------------------------
             # QUESTION KEY
-            # =================================================
+            # ------------------------------------------------
 
             question_key = (
                 skill.id,
@@ -613,6 +817,7 @@ def import_questions_csv(
                     existing_question.topic
                     != topic
                 ):
+
                     existing_question.topic = (
                         topic
                     )
@@ -627,6 +832,7 @@ def import_questions_csv(
                     existing_question.difficulty
                     != difficulty
                 ):
+
                     existing_question.difficulty = (
                         difficulty
                     )
@@ -641,6 +847,7 @@ def import_questions_csv(
                     existing_question.marks
                     != marks
                 ):
+
                     existing_question.marks = (
                         marks
                     )
@@ -659,15 +866,16 @@ def import_questions_csv(
                     existing_question.explanation
                     != new_explanation
                 ):
+
                     existing_question.explanation = (
                         new_explanation
                     )
 
                     question_changed = True
 
-                # =============================================
+                # ---------------------------------------------
                 # OPTIONS
-                # =============================================
+                # ---------------------------------------------
 
                 existing_options = list(
                     existing_question.options
@@ -675,7 +883,8 @@ def import_questions_csv(
 
                 existing_option_texts = [
                     option.option_text.strip()
-                    for option in existing_options
+                    for option
+                    in existing_options
                 ]
 
                 incoming_option_texts = [
@@ -691,7 +900,7 @@ def import_questions_csv(
                 )
 
                 # ---------------------------------------------
-                # REBUILD OPTIONS ONLY IF TEXT CHANGED
+                # REBUILD OPTIONS
                 # ---------------------------------------------
 
                 if options_changed:
@@ -723,20 +932,15 @@ def import_questions_csv(
                 else:
 
                     # -----------------------------------------
-                    # OPTIONS SAME
-                    #
-                    # Only correct answer may have changed.
+                    # ONLY CORRECT ANSWER CHANGED
                     # -----------------------------------------
 
                     for index, option in enumerate(
                         existing_options
                     ):
 
-                        option_key = (
-                            chr(
-                                ord("A")
-                                + index
-                            )
+                        option_key = chr(
+                            ord("A") + index
                         )
 
                         should_be_correct = (
@@ -748,6 +952,7 @@ def import_questions_csv(
                             option.is_correct
                             != should_be_correct
                         ):
+
                             option.is_correct = (
                                 should_be_correct
                             )
@@ -783,7 +988,7 @@ def import_questions_csv(
             )
 
             # -------------------------------------------------
-            # ADD OPTIONS THROUGH RELATIONSHIP
+            # ADD OPTIONS
             # -------------------------------------------------
 
             for key, option_text in (
@@ -804,9 +1009,6 @@ def import_questions_csv(
 
             # -------------------------------------------------
             # ADD TO MAP
-            #
-            # This prevents duplicate rows inside
-            # the SAME CSV.
             # -------------------------------------------------
 
             question_map[
@@ -871,6 +1073,7 @@ def import_questions_csv(
 # DELETE QUESTION
 # ============================================================
 
+
 @router.delete(
     "/{question_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -880,6 +1083,7 @@ def delete_question(
     db: Session = Depends(get_db),
     _: object = Depends(require_admin),
 ):
+
     question = db.get(
         Question,
         question_id,
