@@ -23,7 +23,9 @@ from app.api.routes.battles import router as battles_router
 from app.api.routes.admin_dashboard import (
     router as admin_dashboard_router,
 )
-
+from app.api.routes.admin_management import (
+    router as admin_management_router,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -84,6 +86,7 @@ app.include_router(
 )
 app.include_router(attempts_router,prefix="/api")
 app.include_router(admin_dashboard_router,prefix="/api")
+app.include_router(admin_management_router,prefix="/api")
 app.include_router(
     battles_router,
     prefix="/api",
