@@ -52,7 +52,25 @@ https://quiz-platform-6743.onrender.com/docs
 ![Skill-Tree](screenshots/skilltree.png)
 
 ### Achievements!
-![Skill-Tree](screenshots/achievements.png)
+![Achievements](screenshots/achievements.png)
+
+### Admin-dashboard!
+![Admin-dashboard](screenshots/admin-dashboard.png)
+
+### Question-bank!
+![Question-bank](screenshots/question-bank.png)
+
+### Import csv for question adding!
+![Import-csv](screenshots/import_csv.png)
+
+### Create-quest!
+![Create-Quest](screenshots/create-quest.png)
+
+### Users-section!
+![Create-Quest](screenshots/users-section.png)
+
+### Analytics!
+![Analytics](screenshots/analytics.png)
 
 ### Student Dashboard
 
