@@ -26,6 +26,21 @@ https://quiz-platform-6743.onrender.com/docs
 ---
 
 ## Screenshots with Navigation
+### User Dashboard!
+![Dashboard](screenshots/user.png)
+![Dashboard](screenshots/user2.png)
+
+### Practice skills!
+![Practice](screenshots/practice.png)
+
+### Practice difficulty and topic selection!
+![Practice](screenshots/practice_difficulty.png)
+
+### Practice Test!
+![Practice](screenshots/practice_test.png)
+
+### Battle selection!
+![Practice](screenshots/battle_selection.png)
 
 ### Student Dashboard
 
