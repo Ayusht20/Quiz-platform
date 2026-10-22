@@ -26,6 +26,7 @@ https://quiz-platform-6743.onrender.com/docs
 ---
 
 ## Screenshots with Navigation
+## User Panel! 
 ### User Dashboard!
 ![Dashboard](screenshots/user.png)
 ![Dashboard](screenshots/user2.png)
@@ -53,6 +54,8 @@ https://quiz-platform-6743.onrender.com/docs
 
 ### Achievements!
 ![Achievements](screenshots/achievements.png)
+
+## Admin Panel! 
 
 ### Admin-dashboard!
 ![Admin-dashboard](screenshots/admin-dashboard.png)
