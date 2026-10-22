@@ -436,27 +436,22 @@ export default function BattleSetup() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 
               {[
-                {
-                  value: "BEGINNER",
-                  label: "Beginner",
-                  description: "Warm up",
-                },
-                {
-                  value: "INTERMEDIATE",
-                  label: "Intermediate",
-                  description: "Level up",
-                },
-                {
-                  value: "HARD",
-                  label: "Hard",
-                  description: "Challenge",
-                },
-                {
-                  value: "EXPERT",
-                  label: "Expert",
-                  description: "Elite",
-                },
-              ].map((level) => {
+  {
+    value: "EASY",
+    label: "Easy",
+    description: "Warm up",
+  },
+  {
+    value: "MEDIUM",
+    label: "Medium",
+    description: "Level up",
+  },
+  {
+    value: "HARD",
+    label: "Hard",
+    description: "Challenge",
+  },
+].map((level) => {
 
                 const active =
                   difficulty ===
