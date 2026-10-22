@@ -40,7 +40,19 @@ https://quiz-platform-6743.onrender.com/docs
 ![Practice](screenshots/practice_test.png)
 
 ### Battle selection!
-![Practice](screenshots/battle_selection.png)
+![Practice](screenshots/battle-selection.png)
+
+### Battle !
+![Battle](screenshots/battle.png)
+
+### Quests !
+![Quests](screenshots/quest.png)
+
+### Skill Tree!
+![Skill-Tree](screenshots/skilltree.png)
+
+### Achievements!
+![Skill-Tree](screenshots/achievements.png)
 
 ### Student Dashboard
 
